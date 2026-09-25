@@ -1,0 +1,510 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --color-ghost-blue: #2eb8ff;
+  --color-ghost-cyan: #83dfff;
+  --color-ghost-canvas: #090b0e;
+  --color-ghost-surface: #111419;
+  --color-ghost-border: #303740;
+  --color-ghost-muted: #98a1aa;
+}
+
+@layer base {
+  * {
+    @apply border-ghost-border;
+  }
+  html {
+    @apply bg-ghost-canvas;
+  }
+  body {
+    @apply min-h-screen bg-ghost-canvas font-sans text-[#f2f5f7] antialiased;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  button {
+    @apply cursor-pointer;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply outline-2 outline-offset-2 outline-ghost-blue;
+  }
+}
+
+/* Shared semantic blocks; component composition remains in Tailwind utilities. */
+.shell {
+  @apply flex min-h-screen bg-ghost-canvas;
+}
+.topbar {
+  @apply sticky top-0 z-10 flex h-[70px] items-center justify-between border-b border-[#20252b] bg-[#090b0e] px-7 text-sm text-[#aab4bd] lg:px-12;
+}
+.breadcrumbs {
+  @apply flex min-w-0 items-center gap-3 overflow-hidden whitespace-nowrap;
+}
+.breadcrumbs button {
+  @apply rounded-sm font-semibold text-[#d8e4eb] transition-colors hover:text-ghost-cyan;
+}
+.breadcrumbs span:last-child {
+  @apply overflow-hidden text-ellipsis text-[#83919b];
+}
+.breadcrumbs span:not(:last-child) {
+  @apply text-[#53606c];
+}
+.workspace {
+  @apply mx-auto w-full max-w-[1480px] px-4 pt-7 sm:px-7 sm:pt-10 lg:px-12 lg:pt-[46px];
+}
+.demo-bar {
+  @apply relative mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-[10px] border border-[#2a3038] bg-[#101419] px-4 py-3 sm:mx-7 lg:mx-12;
+}
+.demo-bar::before {
+  content: "";
+  @apply absolute inset-y-0 left-0 z-[1] w-0.5 bg-ghost-blue;
+}
+
+.demo-bar > div,
+.training-card-body,
+.participant-name {
+  @apply relative z-[1] grid gap-0.5;
+}
+.demo-bar strong {
+  @apply text-xs text-[#eef5fa];
+}
+.demo-bar span,
+.muted,
+.subtitle,
+.location,
+.date-line,
+.panel-foot,
+.notice {
+  @apply text-xs text-ghost-muted;
+}
+.demo-bar label {
+  @apply relative z-[1] flex items-center gap-2 text-xs text-[#b8c1c9];
+}
+.demo-bar select,
+.attendance-label select {
+  @apply rounded-md border border-ghost-border bg-[#0b0d10] px-2 py-1.5 text-xs text-[#f2f5f7];
+}
+.heading {
+  @apply mb-8 mt-8 flex flex-wrap items-end justify-between gap-6 lg:my-[42px];
+}
+.eyebrow {
+  @apply text-[10px] font-bold tracking-[0.19em] text-ghost-cyan;
+}
+.heading .eyebrow {
+  @apply relative pl-3;
+}
+.heading .eyebrow::before {
+  content: "";
+  @apply absolute left-0 top-0.5 h-2.5 w-[3px] rounded-full bg-ghost-blue;
+}
+h1,
+h2,
+h3 {
+  @apply font-display text-[#f2f5f7];
+}
+h1 {
+  @apply max-w-[650px] text-[clamp(2rem,3.45vw,3rem)] font-bold leading-[1.08] tracking-[-0.055em];
+}
+.subtitle {
+  @apply mt-3 max-w-[470px] text-sm;
+}
+
+.primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-ghost-blue bg-ghost-blue px-4 py-3 text-sm font-extrabold text-[#071018] transition-colors hover:bg-[#67cdfc] disabled:cursor-not-allowed disabled:border-[#3a4148] disabled:bg-[#30363c] disabled:text-[#89929a] disabled:hover:bg-[#30363c];
+}
+.secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-ghost-border bg-[#171b20] px-4 py-2.5 text-sm font-semibold text-[#e6ebef] transition-colors hover:bg-[#232a31];
+}
+.text-button {
+  @apply border-0 bg-transparent text-sm font-semibold text-ghost-cyan hover:text-[#d7f4ff];
+}
+.pill {
+  @apply inline-flex items-center rounded-full bg-[#20252b] px-2 py-1 text-[10px] font-bold text-[#d7dde3];
+}
+.demo-pill {
+  @apply bg-[#20252b] text-[#cbd3da];
+}
+.green,
+.status-active,
+.status.yes {
+  @apply bg-[#17313f] text-[#91e5ff];
+}
+.status.pending {
+  @apply bg-[#252a30] text-[#d7dde3];
+}
+.status.no,
+.status-inactive {
+  @apply bg-[#2a2f35] text-[#d7dde3];
+}
+
+.stats {
+  @apply mb-[30px] grid gap-3 md:grid-cols-3;
+}
+.stats article {
+  @apply relative min-h-[120px] overflow-hidden rounded-xl border border-[#262c33] bg-gradient-to-br from-[#15191e] to-[#101216] px-6 py-5 shadow-[inset_0_1px_#ffffff08] transition duration-200 hover:-translate-y-0.5 hover:border-[#3a4a57];
+}
+.stat-flame {
+  @apply pointer-events-none absolute -bottom-8 left-1/2 h-[132px] w-auto max-w-none -translate-x-1/2 opacity-[0.18];
+}
+.stats article > span {
+  @apply relative z-10 block max-w-40 text-[9px] font-bold tracking-[0.08em] text-ghost-muted;
+}
+.stats strong {
+  @apply relative z-10 my-4 block text-[42px] leading-none;
+}
+.stats em {
+  @apply text-base not-italic text-[#b7c4cc];
+}
+.training-grid {
+  @apply grid gap-[18px] xl:grid-cols-[minmax(280px,.82fr)_minmax(420px,1.5fr)];
+}
+.panel {
+  @apply rounded-[14px] border border-[#262c33] bg-[#101216] shadow-[inset_0_1px_#ffffff07];
+}
+.panel-header {
+  @apply flex items-start justify-between gap-4 px-6 pb-4 pt-[22px];
+}
+.panel-header h2 {
+  @apply text-[17px] font-bold tracking-[-0.03em];
+}
+.agenda-list {
+  @apply px-2.5 pb-3;
+}
+.training-card {
+  @apply mb-1 flex w-full items-center gap-3 rounded-[10px] border border-transparent bg-transparent p-3 text-left transition-[background-color,border-color,transform] duration-150 hover:translate-x-0.5 hover:bg-[#171c22];
+}
+.training-card.selected {
+  @apply border-[#2f3c47] bg-[#181f26] shadow-[inset_3px_0_#2eb8ff];
+}
+.date-tile {
+  @apply grid h-[52px] min-w-11 place-items-center rounded-lg border border-ghost-border bg-[#0d0f12] py-1;
+}
+.date-tile small {
+  @apply text-[9px] font-bold text-ghost-cyan;
+}
+.date-tile strong {
+  @apply text-base;
+}
+.training-card-body {
+  @apply min-w-0 flex-1;
+}
+.training-card-body strong {
+  @apply truncate text-sm;
+}
+.training-card-body span,
+.training-card-body small,
+.participant-name small {
+  @apply truncate text-xs text-ghost-muted;
+}
+.arrow {
+  @apply grid h-7 w-7 place-items-center rounded-full border border-[#2c3540] text-ghost-cyan;
+}
+.training-card.selected .arrow {
+  @apply border-ghost-blue text-ghost-blue;
+}
+
+.detail {
+  @apply p-5 sm:p-7;
+}
+.detail-top {
+  @apply flex items-center justify-between border-b border-[#252b31] pb-5;
+}
+.detail-heading {
+  @apply flex flex-col justify-between gap-4 py-5 sm:flex-row sm:items-start;
+}
+.training-title {
+  @apply mb-2 text-[29px] font-bold tracking-[-0.045em];
+}
+.location {
+  @apply mt-2;
+}
+.objective {
+  @apply rounded-[10px] border border-[#292f36] border-l-[3px] border-l-[#2a9fdc] bg-gradient-to-r from-[#0e151b] to-[#101216] p-[18px];
+}
+.objective p {
+  @apply mt-2 text-sm text-[#d4dde3];
+}
+.activity-list {
+  @apply mt-[22px] border-t border-[#292f36] pt-1;
+}
+.activity-row {
+  @apply my-2 flex flex-col justify-between gap-4 rounded-[9px] border border-[#292f36] bg-[#0d1014] px-4 py-3 sm:flex-row;
+}
+.activity-row p,
+.activity-row small {
+  @apply mt-1 block text-xs text-ghost-muted;
+}
+.activity-row a {
+  @apply self-start whitespace-nowrap text-sm font-bold text-ghost-cyan sm:self-center;
+}
+.participants-heading {
+  @apply mt-7 flex items-center justify-between gap-4;
+}
+.participants {
+  @apply divide-y divide-[#292f36];
+}
+.participant {
+  @apply flex flex-wrap items-center gap-3 py-4;
+}
+.ghost-avatar {
+  @apply grid shrink-0 place-items-center overflow-hidden rounded-full bg-[#202831] text-xs font-bold text-[#dfe9ef];
+}
+.ghost-avatar img {
+  @apply h-full w-full object-cover;
+}
+.participant > .ghost-avatar {
+  @apply h-10 w-10;
+}
+.participant-name {
+  @apply min-w-[140px] flex-1;
+}
+.status {
+  @apply rounded-full px-2 py-1 text-[10px] font-bold;
+}
+.attendance-label {
+  @apply ml-auto grid gap-1 text-[10px] text-ghost-muted;
+}
+.rsvp-box {
+  @apply mt-7 rounded-xl border border-[#292f36] bg-[#0d1014] p-5;
+}
+.rsvp-buttons {
+  @apply mt-3 flex flex-wrap gap-2;
+}
+.choice {
+  @apply rounded-md border border-ghost-border bg-[#171b20] px-3 py-2 text-sm font-semibold text-[#e6ebef] hover:bg-[#232a31];
+}
+.choice.chosen {
+  @apply border-ghost-blue bg-[#1b2933] text-[#f4f8fa];
+}
+.attendance-summary {
+  @apply mt-4 text-xs text-ghost-muted;
+}
+
+.roster-grid {
+  @apply grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3;
+}
+.member-card {
+  @apply rounded-xl border border-[#293039] bg-ghost-surface p-5 transition hover:-translate-y-0.5 hover:border-[#3a4b58] hover:shadow-[0_16px_32px_rgba(0,0,0,0.18)];
+}
+.member-card-top {
+  @apply flex items-start justify-between;
+}
+.member-card .large {
+  @apply h-12 w-12 text-sm;
+}
+.member-card h3 {
+  @apply mt-4 text-base font-bold;
+}
+.member-card p {
+  @apply mt-1 text-xs text-ghost-muted;
+}
+.member-pills {
+  @apply mt-3 flex flex-wrap gap-1.5;
+}
+.my-profile {
+  @apply max-w-[720px];
+}
+.profile-summary {
+  @apply flex items-center gap-5 px-6 pb-6 pt-2;
+}
+.profile-summary h3 {
+  @apply mb-2 text-base;
+}
+.profile-summary p {
+  @apply text-xs text-ghost-muted;
+}
+.profile-avatar {
+  @apply h-[88px] w-[88px] text-xl ring-2 ring-[#2eb8ff33] ring-offset-4 ring-offset-[#101216];
+}
+.panel-foot {
+  @apply border-t border-[#292f36] px-6 py-4;
+}
+.notice {
+  @apply mt-8;
+}
+footer {
+  @apply mt-5 flex flex-wrap gap-2 border-t border-[#20252b] py-6 text-[10px] text-[#858f99];
+}
+footer span:first-child {
+  @apply font-bold tracking-[0.12em] text-[#d4dde3];
+}
+
+.editor-form label,
+.editor-form fieldset {
+  @apply grid gap-1.5 text-sm font-semibold text-[#dce5eb];
+}
+.form-grid,
+.activity-grid {
+  @apply grid gap-4 md:grid-cols-2;
+}
+.activity-grid {
+  @apply lg:grid-cols-3;
+}
+.activity-grid .wide {
+  @apply lg:col-span-2;
+}
+.field-label {
+  @apply inline;
+}
+.required-mark {
+  @apply font-bold text-red-400;
+}
+.error {
+  @apply text-[11px] font-normal text-red-400;
+}
+.activity-editor {
+  @apply flex flex-col border-t border-[#283039] pt-5;
+}
+.activity-editor > .panel-header {
+  @apply order-1 border-b border-[#283039] px-0 pb-4 pt-5;
+}
+.activity-editor h3 {
+  @apply text-base;
+}
+.activity-form {
+  @apply mt-4;
+}
+.activity-form-header {
+  @apply mb-3 flex items-center justify-between gap-3;
+}
+.member-checkbox {
+  @apply flex min-h-[38px] items-center gap-2 py-1.5 text-xs font-medium text-[#eaf0f4];
+}
+.member-checkbox small {
+  @apply ml-auto text-[10px] text-ghost-muted;
+}
+.position-options {
+  @apply md:grid-cols-2 md:gap-x-3;
+}
+.photo-field {
+  @apply grid gap-2;
+}
+.photo-upload {
+  @apply flex items-start gap-3;
+}
+.photo-upload img {
+  @apply h-32 w-32 rounded-full object-cover ring-2 ring-[#2eb8ff44] ring-offset-4 ring-offset-[#111419];
+}
+.photo-upload input[type="file"] {
+  @apply mt-10 max-w-[240px] text-xs font-normal;
+}
+.form-actions {
+  @apply flex justify-end gap-3 border-t border-[#283039] pt-5;
+}
+
+@media (max-width: 700px) {
+  .profile-summary {
+    @apply px-5 pb-5;
+  }
+  .profile-avatar {
+    @apply h-16 w-16;
+  }
+  .form-actions {
+    @apply flex-col-reverse;
+  }
+  .form-actions > * {
+    @apply w-full;
+  }
+}
+
+/* Seletores nos editores: opções grandes, escaneáveis e acessíveis. */
+.selection-panel {
+  @apply grid gap-2 rounded-xl border border-[#2d3741] bg-[#0d1014] p-4;
+}
+.selection-panel legend {
+  @apply flex items-center gap-1 pb-1 text-sm font-bold text-[#eaf1f5];
+}
+.invitee-selector {
+  @apply grid-cols-1 sm:grid-cols-2;
+}
+.invitee-selector > div:first-child {
+  @apply col-span-full mb-1;
+}
+.position-options,
+.role-selector {
+  @apply grid-cols-1 sm:grid-cols-2;
+}
+.editor-form .selection-panel .member-checkbox {
+  @apply flex min-h-11 items-center gap-2 rounded-lg border border-transparent bg-[#14191f] px-3 py-2 text-left text-[13px] leading-none transition-colors hover:border-[#355a71] hover:bg-[#17232c];
+}
+.selection-panel .member-checkbox:has(button[data-state="checked"]) {
+  @apply border-[#2c8bc0] bg-[#132a38] text-[#effaff] shadow-[inset_3px_0_#2eb8ff];
+}
+.selection-panel .member-checkbox small {
+  @apply text-right;
+}
+.invitee-selector > div:first-child > button {
+  @apply rounded-md border border-[#355a71] bg-[#132330] px-3 py-1.5 text-xs font-bold text-ghost-cyan transition-colors hover:bg-[#193447];
+}
+.editor-form select {
+  @apply cursor-pointer appearance-none bg-[linear-gradient(45deg,transparent_50%,#83dfff_50%),linear-gradient(135deg,#83dfff_50%,transparent_50%)] bg-[position:calc(100%-18px)_50%,calc(100%-13px)_50%] bg-[size:5px_5px,5px_5px] bg-no-repeat pr-10;
+}
+.calendar-widget {
+  @apply mx-2.5 mb-3 grid gap-3 rounded-lg border border-[#29323b] bg-[#11161c] p-3;
+}
+.calendar-widget strong {
+  @apply capitalize text-sm text-[#eaf4f9];
+}
+.calendar-nav {
+  @apply grid size-7 place-items-center rounded-md text-[#9eabb5] transition-colors hover:bg-[#1c2c37] hover:text-ghost-cyan;
+}
+.calendar-weekdays,
+.calendar-days {
+  @apply grid grid-cols-7 gap-1 text-center text-[10px];
+}
+.calendar-weekdays {
+  @apply text-[#6f7d88];
+}
+.calendar-days > span,
+.calendar-day {
+  @apply grid h-8 place-items-center rounded-md text-xs text-[#aab5bd];
+}
+.calendar-day.has-training,
+.calendar-day.selected {
+  @apply relative bg-[#173447] font-bold text-[#e9f8ff] transition-colors hover:bg-[#20506a];
+}
+.calendar-day.selected {
+  @apply bg-ghost-blue text-[#071018] hover:bg-[#76d5ff];
+}
+.calendar-day i {
+  @apply absolute bottom-1 size-1 rounded-full bg-ghost-cyan;
+}
+.calendar-day.selected i {
+  @apply bg-[#071018];
+}
+.template-picker {
+  @apply relative;
+}
+.template-options {
+  @apply absolute z-30 top-full mt-1 grid max-h-52 w-full overflow-y-auto rounded-lg border border-[#355a71] bg-[#11171d] p-1 shadow-2xl;
+}
+.template-options button {
+  @apply grid gap-0.5 rounded-md px-3 py-2 text-left text-xs text-[#eaf4f9] hover:bg-[#173447];
+}
+.template-options button span,
+.template-options p {
+  @apply text-[10px] text-[#91a1ac];
+}
+.template-options p {
+  @apply px-3 py-2;
+}
+[role="status"]:has(> button) {
+  @apply flex items-center gap-4;
+}
+[role="status"] > button {
+  @apply ml-auto grid size-6 place-items-center rounded text-lg font-normal leading-none hover:bg-black/20;
+}
+.editor-form label:has(input:valid) .required-mark,
+.editor-form label:has(select:valid) .required-mark {
+  @apply text-[#8b949e];
+}
