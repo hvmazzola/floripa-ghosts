@@ -31,7 +31,6 @@ import {
   hideTeamPostForMember,
   isTeamPostReadByMember,
   isTeamPostList,
-  markAllTeamPostsRead,
   markTeamPostRead,
   normalizeTeamPosts,
   seedTeamPosts,
@@ -40,6 +39,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { Confirmation } from "@/components/confirm-dialog";
+import {
+  PostContextMenu,
+  type PostContextMenuState,
+} from "@/components/post-context-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarDays,
@@ -74,6 +77,7 @@ import { Dashboard, TrainingCalendar } from "@/features/dashboard/dashboard-view
 import { TrainingEditor } from "@/features/trainings/training-editor";
 import { ProfileEditor } from "@/features/roster/profile-editor";
 import { readStoredText, readStoredValue, writeStoredValue } from "@/lib/demo-store";
+import { getContextMenuPosition } from "@/lib/context-menu";
 const STORAGE = "ghosts-demo-v1";
 const ROSTER_STORAGE = "ghosts-demo-roster-v1";
 const VIEW_STORAGE = "ghosts-demo-view-v1";
@@ -175,6 +179,8 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationContextMenu, setNotificationContextMenu] =
+    useState<PostContextMenuState | null>(null);
   const [selectedPost, setSelectedPost] = useState<TeamPost | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [rosterFilter, setRosterFilter] = useState<"all" | Role>("all");
@@ -305,6 +311,7 @@ export default function Home() {
     const closeNotifications = (event: MouseEvent) => {
       if (!notificationsRef.current?.contains(event.target as Node)) {
         setNotificationsOpen(false);
+        setNotificationContextMenu(null);
       }
     };
     document.addEventListener("mousedown", closeNotifications);
@@ -354,7 +361,12 @@ export default function Home() {
     if (selectedPost?.id === post.id) setSelectedPost(updated);
   };
   const markAllNotificationsRead = () => {
-    savePosts(markAllTeamPostsRead(notificationPosts, actor.id));
+    const notificationIds = new Set(notificationPosts.map((post) => post.id));
+    savePosts(
+      posts.map((post) =>
+        notificationIds.has(post.id) ? markTeamPostRead(post, actor.id, true) : post,
+      ),
+    );
   };
   const openPost = (post: TeamPost) => {
     const updated = markTeamPostRead(post, actor.id, true);
@@ -718,7 +730,10 @@ export default function Home() {
                 className="relative grid h-10 w-10 place-items-center rounded-full border border-[#303740] bg-[#151a20] text-[#cbd8df] transition-colors hover:border-[#3c6982] hover:bg-[#1b2a35] hover:text-[#83dfff]"
                 aria-label="Abrir notificações"
                 aria-expanded={notificationsOpen}
-                onClick={() => setNotificationsOpen((open) => !open)}
+                onClick={() => {
+                  setNotificationsOpen((open) => !open);
+                  setNotificationContextMenu(null);
+                }}
               >
                 <Bell size={18} />
                 {unreadNotificationCount > 0 && (
@@ -743,7 +758,7 @@ export default function Home() {
                     {notificationPosts.slice(0, 6).map((post) => (
                       <article
                         key={post.id}
-                        className={`block w-full border-b border-[#29313a] px-4 py-3 text-left transition-colors last:border-0 hover:bg-[#192129] ${isTeamPostReadByMember(post, actor.id) ? "bg-transparent" : "bg-[#17232c]"}`}
+                        className={`relative block w-full border-b border-[#29313a] px-4 py-3 text-left transition-colors last:border-0 hover:bg-[#192129] ${isTeamPostReadByMember(post, actor.id) ? "bg-transparent" : "bg-[#17232c]"}`}
                         role="button"
                         tabIndex={0}
                         onClick={() => {
@@ -756,6 +771,16 @@ export default function Home() {
                             setNotificationsOpen(false);
                           }
                         }}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          setNotificationContextMenu({
+                            post,
+                            ...getContextMenuPosition(
+                              { x: event.clientX, y: event.clientY },
+                              { width: window.innerWidth, height: window.innerHeight },
+                            ),
+                          });
+                        }}
                       >
                         <span className="flex items-center gap-2 truncate text-sm font-bold text-[#e8f1f5]">
                           {!isTeamPostReadByMember(post, actor.id) && (
@@ -767,13 +792,15 @@ export default function Home() {
                           {post.message}
                         </span>
                         <button
-                          className="mt-2 text-xs font-semibold text-[#aebbc4] hover:text-white"
+                          className="absolute right-3 top-3 grid size-7 place-items-center rounded-full text-lg leading-none text-[#92a2ad] transition-colors hover:bg-[#28323a] hover:text-white"
+                          aria-label={`Excluir ${post.title} da minha lista`}
+                          title="Excluir da minha lista"
                           onClick={(event) => {
                             event.stopPropagation();
                             requestHidePost(post);
                           }}
                         >
-                          Excluir da minha lista
+                          ×
                         </button>
                       </article>
                     ))}
@@ -785,6 +812,17 @@ export default function Home() {
                   </div>
                 </section>
               )}
+              <PostContextMenu
+                menu={notificationContextMenu}
+                isRead={
+                  notificationContextMenu
+                    ? isTeamPostReadByMember(notificationContextMenu.post, actor.id)
+                    : false
+                }
+                onClose={() => setNotificationContextMenu(null)}
+                onToggleRead={setPostRead}
+                onHide={requestHidePost}
+              />
             </div>
             <span className="pill demo-pill">Demonstração local</span>
           </div>

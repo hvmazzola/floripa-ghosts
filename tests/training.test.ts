@@ -25,6 +25,7 @@ import {
   markTeamPostRead,
   seedTeamPosts,
 } from "../src/domain/communication.ts";
+import { getContextMenuPosition } from "../src/lib/context-menu.ts";
 const input = {
   title: "Treino",
   eventTag: "Pré-campeonato",
@@ -280,5 +281,16 @@ test("marcar todas como lidas não altera recibos de outros integrantes", () => 
   assert.equal(
     updated.some((post) => isTeamPostReadByMember(post, "coach-demo")),
     false,
+  );
+});
+
+test("menu de contexto fica próximo ao clique sem sair da janela", () => {
+  assert.deepEqual(
+    getContextMenuPosition({ x: 1180, y: 760 }, { width: 1200, height: 800 }),
+    { x: 968, y: 692 },
+  );
+  assert.deepEqual(
+    getContextMenuPosition({ x: 2, y: 3 }, { width: 1200, height: 800 }),
+    { x: 8, y: 8 },
   );
 });
