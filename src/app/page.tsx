@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DayPicker } from "react-day-picker";
@@ -28,11 +28,17 @@ import {
 import {
   canDeleteTeamPost,
   createTeamPost,
+  hideTeamPostForMember,
+  isTeamPostReadByMember,
   isTeamPostList,
+  markTeamPostRead,
+  normalizeTeamPosts,
   seedTeamPosts,
 } from "@/domain/communication";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import type { Confirmation } from "@/components/confirm-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarDays,
@@ -169,8 +175,11 @@ export default function Home() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<TeamPost | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [rosterFilter, setRosterFilter] = useState<"all" | Role>("all");
   const [ready, setReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const setActiveView = (
     next:
       "dashboard" | "trainings" | "roster" | "profile" | "exercises" | "communication",
@@ -247,8 +256,9 @@ export default function Home() {
       isTeamPostList,
       seedTeamPosts(),
     );
-    setPosts(storedPosts.value);
-    writeStoredValue(localStorage, COMMUNICATION_STORAGE, storedPosts.value);
+    const initialPosts = normalizeTeamPosts(storedPosts.value);
+    setPosts(initialPosts);
+    writeStoredValue(localStorage, COMMUNICATION_STORAGE, initialPosts);
     const storedTrainings = readStoredValue(localStorage, STORAGE, Array.isArray, []);
     const migrated = migrateTrainingList(storedTrainings.value, initialRoster);
     const initial = (migrated ?? seedTrainings()).map((training) => ({
@@ -290,6 +300,15 @@ export default function Home() {
     }
     setReady(true);
   }, []);
+  useEffect(() => {
+    const closeNotifications = (event: MouseEvent) => {
+      if (!notificationsRef.current?.contains(event.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", closeNotifications);
+    return () => document.removeEventListener("mousedown", closeNotifications);
+  }, []);
   const available = trainings
     .filter(
       (training) =>
@@ -306,6 +325,12 @@ export default function Home() {
   const actor =
     roster.find((member) => member.id === actorId) ??
     seedMembers().find((member) => member.id === actorId)!;
+  const visibleRoster = roster.filter(
+    (member) => rosterFilter === "all" || member.roles.includes(rosterFilter),
+  );
+  const visiblePosts = posts.filter(
+    (post) => !post.hiddenByMemberIds.includes(actor.id),
+  );
   const notificationPosts = posts
     .filter(
       (post) =>
@@ -313,7 +338,42 @@ export default function Home() {
         post.kind === "announcement" ||
         post.recipientId === actor.id,
     )
+    .filter((post) => !post.hiddenByMemberIds.includes(actor.id))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const unreadNotificationCount = notificationPosts.filter(
+    (post) => !isTeamPostReadByMember(post, actor.id),
+  ).length;
+  const savePosts = (next: TeamPost[]) => {
+    setPosts(next);
+    writeStoredValue(localStorage, COMMUNICATION_STORAGE, next);
+  };
+  const setPostRead = (post: TeamPost, read: boolean) => {
+    const updated = markTeamPostRead(post, actor.id, read);
+    savePosts(posts.map((item) => (item.id === post.id ? updated : item)));
+    if (selectedPost?.id === post.id) setSelectedPost(updated);
+  };
+  const openPost = (post: TeamPost) => {
+    const updated = markTeamPostRead(post, actor.id, true);
+    savePosts(posts.map((item) => (item.id === post.id ? updated : item)));
+    setSelectedPost(updated);
+  };
+  const requestHidePost = (post: TeamPost) => {
+    setConfirmation({
+      title: "Ocultar mensagem?",
+      description:
+        "Ela sairá apenas da sua visão. As outras pessoas continuarão vendo a comunicação.",
+      confirmLabel: "Ocultar para mim",
+      onConfirm: () => {
+        savePosts(
+          posts.map((item) =>
+            item.id === post.id ? hideTeamPostForMember(item, actor.id) : item,
+          ),
+        );
+        setSelectedPost(null);
+        showFeedback("Mensagem ocultada da sua visão.", "success");
+      },
+    });
+  };
   const save = (
     next: Training[],
     message = "Alterações salvas neste navegador.",
@@ -356,26 +416,33 @@ export default function Home() {
       showFeedback("Somente admins podem excluir treinos.", "error");
       return;
     }
-    if (
-      !window.confirm(
-        `Excluir o treino “${training.title}”? Esta ação não pode ser desfeita.`,
-      )
-    )
-      return;
-    const next = trainings.filter((item) => item.id !== training.id);
-    save(next, "Treino excluído.");
-    selectTraining(next[0]?.id ?? "");
+    setConfirmation({
+      title: "Excluir treino?",
+      description: `“${training.title}” será removido permanentemente do time.`,
+      confirmLabel: "Excluir",
+      onConfirm: () => {
+        const next = trainings.filter((item) => item.id !== training.id);
+        save(next, "Treino excluído.");
+        selectTraining(next[0]?.id ?? "");
+      },
+    });
   };
   const deleteExercise = (exercise: TrainingActivity) => {
     if (!actor.isAdmin) {
       showFeedback("Somente admins podem excluir exercícios.", "error");
       return;
     }
-    if (!window.confirm(`Excluir o exercício “${exercise.drill}”?`)) return;
-    const next = exercises.filter((item) => item.id !== exercise.id);
-    setExercises(next);
-    writeStoredValue(localStorage, EXERCISE_STORAGE, next);
-    showFeedback("Exercício excluído.", "success");
+    setConfirmation({
+      title: "Excluir exercício?",
+      description: `“${exercise.drill}” será removido da biblioteca de exercícios.`,
+      confirmLabel: "Excluir",
+      onConfirm: () => {
+        const next = exercises.filter((item) => item.id !== exercise.id);
+        setExercises(next);
+        writeStoredValue(localStorage, EXERCISE_STORAGE, next);
+        showFeedback("Exercício excluído.", "success");
+      },
+    });
   };
   const saveRoster = (next: Member[], message: string) => {
     setRoster(next);
@@ -407,23 +474,30 @@ export default function Home() {
       );
       return;
     }
-    if (!window.confirm(`Excluir “${member.name}” do elenco?`)) return;
-    const nextRoster = roster.filter((item) => item.id !== member.id);
-    const nextTrainings = trainings.map((training) => ({
-      ...training,
-      invitations: training.invitations.filter((item) => item.memberId !== member.id),
-    }));
-    setRoster(nextRoster);
-    setTrainings(nextTrainings);
-    writeStoredValue(localStorage, ROSTER_STORAGE, nextRoster);
-    writeStoredValue(localStorage, STORAGE, nextTrainings);
-    showFeedback("Integrante excluído do elenco.", "success");
+    setConfirmation({
+      title: "Excluir integrante?",
+      description: `“${member.name}” será removido do elenco e das convocações futuras.`,
+      confirmLabel: "Excluir",
+      onConfirm: () => {
+        const nextRoster = roster.filter((item) => item.id !== member.id);
+        const nextTrainings = trainings.map((training) => ({
+          ...training,
+          invitations: training.invitations.filter(
+            (item) => item.memberId !== member.id,
+          ),
+        }));
+        setRoster(nextRoster);
+        setTrainings(nextTrainings);
+        writeStoredValue(localStorage, ROSTER_STORAGE, nextRoster);
+        writeStoredValue(localStorage, STORAGE, nextTrainings);
+        showFeedback("Integrante excluído do elenco.", "success");
+      },
+    });
   };
   const createPost = (input: TeamPostInput) => {
     try {
       const next = [createTeamPost(input, role, actor.id, roster), ...posts];
-      setPosts(next);
-      writeStoredValue(localStorage, COMMUNICATION_STORAGE, next);
+      savePosts(next);
       showFeedback("Mensagem publicada.", "success");
     } catch (error) {
       showFeedback(
@@ -437,11 +511,17 @@ export default function Home() {
       showFeedback("Somente admins podem excluir mensagens.", "error");
       return;
     }
-    if (!window.confirm("Excluir esta mensagem?")) return;
-    const next = posts.filter((post) => post.id !== postId);
-    setPosts(next);
-    writeStoredValue(localStorage, COMMUNICATION_STORAGE, next);
-    showFeedback("Mensagem excluída.", "success");
+    setConfirmation({
+      title: "Excluir mensagem para todos?",
+      description:
+        "A comunicação será removida da plataforma para todos os integrantes.",
+      confirmLabel: "Excluir",
+      onConfirm: () => {
+        savePosts(posts.filter((post) => post.id !== postId));
+        setSelectedPost(null);
+        showFeedback("Mensagem excluída.", "success");
+      },
+    });
   };
   const confirmed =
     current?.invitations.filter((invitation) => invitation.rsvp === "yes").length ?? 0;
@@ -532,20 +612,22 @@ export default function Home() {
               Elenco
             </span>
           </button>
-          <button
-            className={`flex h-12 items-center overflow-hidden rounded-[10px] text-left transition-colors focus-visible:outline focus-visible:outline-3 focus-visible:outline-[#2eb8ff] ${view === "exercises" ? "bg-[#17232c] text-[#f4f8fb] shadow-[inset_3px_0_#2eb8ff]" : "text-[#98a3ad] hover:bg-[#151d24] hover:text-[#eaf4f9]"}`}
-            aria-label="Exercícios"
-            onClick={() => setActiveView("exercises")}
-          >
-            <span className="grid h-12 w-12 min-w-12 place-items-center text-lg text-[#8a97a2]">
-              ◈
-            </span>
-            <span
-              className={`whitespace-nowrap text-[13px] font-bold transition-[max-width,opacity,transform] duration-300 ${sidebarOpen ? "max-w-40 translate-x-0 opacity-100" : "max-w-0 -translate-x-2 opacity-0"}`}
+          {(role === "coach" || actor.isAdmin) && (
+            <button
+              className={`flex h-12 items-center overflow-hidden rounded-[10px] text-left transition-colors focus-visible:outline focus-visible:outline-3 focus-visible:outline-[#2eb8ff] ${view === "exercises" ? "bg-[#17232c] text-[#f4f8fb] shadow-[inset_3px_0_#2eb8ff]" : "text-[#98a3ad] hover:bg-[#151d24] hover:text-[#eaf4f9]"}`}
+              aria-label="Exercícios"
+              onClick={() => setActiveView("exercises")}
             >
-              Exercícios
-            </span>
-          </button>{" "}
+              <span className="grid h-12 w-12 min-w-12 place-items-center text-lg text-[#8a97a2]">
+                ◈
+              </span>
+              <span
+                className={`whitespace-nowrap text-[13px] font-bold transition-[max-width,opacity,transform] duration-300 ${sidebarOpen ? "max-w-40 translate-x-0 opacity-100" : "max-w-0 -translate-x-2 opacity-0"}`}
+              >
+                Exercícios
+              </span>
+            </button>
+          )}
           <button
             className={`flex h-12 items-center overflow-hidden rounded-[10px] text-left transition-colors focus-visible:outline focus-visible:outline-3 focus-visible:outline-[#2eb8ff] ${view === "communication" ? "bg-[#17232c] text-[#f4f8fb] shadow-[inset_3px_0_#2eb8ff]" : "text-[#98a3ad] hover:bg-[#151d24] hover:text-[#eaf4f9]"}`}
             aria-label="Comunicação"
@@ -627,7 +709,7 @@ export default function Home() {
             </span>
           </nav>
           <div className="relative flex items-center gap-3">
-            <div className="relative">
+            <div className="relative" ref={notificationsRef}>
               <button
                 className="relative grid h-10 w-10 place-items-center rounded-full border border-[#303740] bg-[#151a20] text-[#cbd8df] transition-colors hover:border-[#3c6982] hover:bg-[#1b2a35] hover:text-[#83dfff]"
                 aria-label="Abrir notificações"
@@ -635,9 +717,9 @@ export default function Home() {
                 onClick={() => setNotificationsOpen((open) => !open)}
               >
                 <Bell size={18} />
-                {notificationPosts.length > 0 && (
+                {unreadNotificationCount > 0 && (
                   <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-[#2eb8ff] px-1 text-[9px] font-extrabold text-[#071018]">
-                    {notificationPosts.length > 9 ? "9+" : notificationPosts.length}
+                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
                   </span>
                 )}
               </button>
@@ -659,13 +741,21 @@ export default function Home() {
                     {notificationPosts.slice(0, 6).map((post) => (
                       <button
                         key={post.id}
-                        className="block w-full border-b border-[#29313a] px-4 py-3 text-left transition-colors last:border-0 hover:bg-[#192129]"
+                        className={`block w-full border-b border-[#29313a] px-4 py-3 text-left transition-colors last:border-0 hover:bg-[#192129] ${isTeamPostReadByMember(post, actor.id) ? "bg-transparent" : "bg-[#17232c]"}`}
+                        onMouseEnter={() => {
+                          if (!isTeamPostReadByMember(post, actor.id)) {
+                            setPostRead(post, true);
+                          }
+                        }}
                         onClick={() => {
-                          setSelectedPost(post);
+                          openPost(post);
                           setNotificationsOpen(false);
                         }}
                       >
-                        <span className="block truncate text-sm font-bold text-[#e8f1f5]">
+                        <span className="flex items-center gap-2 truncate text-sm font-bold text-[#e8f1f5]">
+                          {!isTeamPostReadByMember(post, actor.id) && (
+                            <i className="size-2 shrink-0 rounded-full bg-[#58cfff]" />
+                          )}
                           {post.title}
                         </span>
                         <span className="mt-1 block truncate text-xs text-[#9daab4]">
@@ -759,14 +849,17 @@ export default function Home() {
             />
           ) : view === "communication" ? (
             <CommunicationView
-              posts={posts}
+              posts={visiblePosts}
               roster={roster}
               role={role}
               actor={actor}
               isAdmin={actor.isAdmin}
+              isPostRead={(post) => isTeamPostReadByMember(post, actor.id)}
               onCreate={createPost}
               onDelete={deletePost}
-              onOpen={setSelectedPost}
+              onHide={requestHidePost}
+              onOpen={openPost}
+              onToggleRead={setPostRead}
             />
           ) : view === "exercises" ? (
             <section className="panel">
@@ -881,14 +974,36 @@ export default function Home() {
                   <h2>Elenco</h2>
                   <span className="muted">Perfis e atribuições do time</span>
                 </div>
-                {actor.isAdmin && (
-                  <button className="primary" onClick={() => setProfileEditing(null)}>
-                    <Plus size={16} strokeWidth={2.2} /> Integrante
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div
+                    className="flex rounded-lg border border-[#303942] bg-[#0d1115] p-1"
+                    aria-label="Filtrar elenco"
+                  >
+                    {(
+                      [
+                        ["all", "Todos"],
+                        ["athlete", "Atletas"],
+                        ["coach", "Coaches"],
+                      ] as const
+                    ).map(([filter, label]) => (
+                      <button
+                        className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${rosterFilter === filter ? "bg-[#1d4054] text-[#dff6ff]" : "text-[#9dacb6] hover:bg-[#1a2026] hover:text-white"}`}
+                        key={filter}
+                        onClick={() => setRosterFilter(filter)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {actor.isAdmin && (
+                    <button className="primary" onClick={() => setProfileEditing(null)}>
+                      <Plus size={16} strokeWidth={2.2} /> Integrante
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="roster-grid">
-                {roster.map((member) => (
+                {visibleRoster.map((member) => (
                   <article className="member-card" key={member.id}>
                     <div className="member-card-top">
                       <Avatar member={member} className="large" />
@@ -926,18 +1041,21 @@ export default function Home() {
                           {item === "coach" ? "Coach" : "Atleta"}
                         </span>
                       ))}
-                      <span
-                        className={
-                          member.status === "active"
-                            ? "pill status-active"
-                            : "pill status-inactive"
-                        }
-                      >
-                        {member.status === "active" ? "Ativo" : "Inativo"}
-                      </span>
+                      {member.status === "active" ? (
+                        <span className="pill status-active">Ativo</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#9f4e46] bg-[#3a1d20] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#ffb8ae]">
+                          <i className="size-1.5 rounded-full bg-[#ff7b70]" /> Inativo
+                        </span>
+                      )}
                     </div>
                   </article>
                 ))}
+                {!visibleRoster.length && (
+                  <p className="muted col-span-full py-8 text-center">
+                    Nenhum integrante corresponde a este filtro.
+                  </p>
+                )}
               </div>
             </section>
           ) : (
@@ -1148,13 +1266,14 @@ export default function Home() {
                               <button
                                 className="secondary !px-3 !py-2 !text-xs"
                                 onClick={() => {
-                                  if (
-                                    window.confirm(
-                                      "Cancelar o início e limpar o registro atual?",
-                                    )
-                                  ) {
-                                    update(resetTrainingExecution(current, role));
-                                  }
+                                  setConfirmation({
+                                    title: "Cancelar início?",
+                                    description:
+                                      "O registro atual da execução será limpo e o treino voltará para não iniciado.",
+                                    confirmLabel: "Cancelar início",
+                                    onConfirm: () =>
+                                      update(resetTrainingExecution(current, role)),
+                                  });
                                 }}
                               >
                                 Cancelar início
@@ -1162,13 +1281,14 @@ export default function Home() {
                               <button
                                 className="secondary !px-3 !py-2 !text-xs"
                                 onClick={() => {
-                                  if (
-                                    window.confirm(
-                                      "Reiniciar a execução e limpar o registro atual?",
-                                    )
-                                  ) {
-                                    update(resetTrainingExecution(current, role));
-                                  }
+                                  setConfirmation({
+                                    title: "Reiniciar execução?",
+                                    description:
+                                      "As atividades e observações registradas serão limpas para recomeçar o tracker.",
+                                    confirmLabel: "Reiniciar",
+                                    onConfirm: () =>
+                                      update(resetTrainingExecution(current, role)),
+                                  });
                                 }}
                               >
                                 Reiniciar
@@ -1572,7 +1692,12 @@ export default function Home() {
         />
       )}
       {exerciseDraft && (
-        <div className="overlay !fixed !inset-0 !z-50 !flex !items-center !justify-center bg-black/80 p-5 backdrop-blur-sm">
+        <div
+          className="overlay !fixed !inset-0 !z-50 !flex !items-center !justify-center bg-black/80 p-5 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setExerciseDraft(null);
+          }}
+        >
           <section className="modal editor-modal !w-[min(680px,calc(100vw-40px))] !max-w-none rounded-2xl border border-[#313943] bg-[#111419] shadow-2xl">
             <div className="panel-header flex items-start justify-between border-b border-[#283039] bg-transparent px-8 py-7 max-sm:px-5">
               <div>
@@ -1750,9 +1875,16 @@ export default function Home() {
         <PostModal
           post={selectedPost}
           roster={roster}
+          isRead={isTeamPostReadByMember(selectedPost, actor.id)}
           onClose={() => setSelectedPost(null)}
+          onHide={() => requestHidePost(selectedPost)}
+          onMarkUnread={() => setPostRead(selectedPost, false)}
         />
       )}
+      <ConfirmDialog
+        confirmation={confirmation}
+        onClose={() => setConfirmation(null)}
+      />
       <FeedbackToast feedback={feedback} onClose={() => setFeedback(null)} />
     </div>
   );

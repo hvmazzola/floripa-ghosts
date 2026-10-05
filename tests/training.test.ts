@@ -17,7 +17,13 @@ import {
   updateActivityExecution,
   finishTrainingExecution,
 } from "../src/domain/training.ts";
-import { canDeleteTeamPost } from "../src/domain/communication.ts";
+import {
+  canDeleteTeamPost,
+  hideTeamPostForMember,
+  isTeamPostReadByMember,
+  markTeamPostRead,
+  seedTeamPosts,
+} from "../src/domain/communication.ts";
 const input = {
   title: "Treino",
   eventTag: "Pré-campeonato",
@@ -249,4 +255,15 @@ test("admin administra elenco e atleta altera somente o próprio perfil", () => 
 test("somente admins podem excluir comunicações do time", () => {
   assert.equal(canDeleteTeamPost(true), true);
   assert.equal(canDeleteTeamPost(false), false);
+});
+
+test("leitura e ocultação de comunicação são individuais", () => {
+  const [post] = seedTeamPosts();
+  const read = markTeamPostRead(post, "mazzola", true);
+  assert.equal(isTeamPostReadByMember(read, "mazzola"), true);
+  assert.equal(isTeamPostReadByMember(read, "coach-demo"), false);
+
+  const hidden = hideTeamPostForMember(read, "mazzola");
+  assert.ok(hidden.hiddenByMemberIds.includes("mazzola"));
+  assert.equal(hidden.hiddenByMemberIds.includes("coach-demo"), false);
 });

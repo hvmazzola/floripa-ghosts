@@ -12,18 +12,24 @@ export function CommunicationView({
   role,
   actor,
   isAdmin,
+  isPostRead,
   onCreate,
   onDelete,
+  onHide,
   onOpen,
+  onToggleRead,
 }: {
   posts: TeamPost[];
   roster: Member[];
   role: Role;
   actor: Member;
   isAdmin: boolean;
+  isPostRead: (post: TeamPost) => boolean;
   onCreate: (input: TeamPostInput) => void;
   onDelete: (postId: string) => void;
+  onHide: (post: TeamPost) => void;
   onOpen: (post: TeamPost) => void;
+  onToggleRead: (post: TeamPost, read: boolean) => void;
 }) {
   const athletes = roster.filter(
     (member) => member.status === "active" && member.roles.includes("athlete"),
@@ -132,7 +138,7 @@ export function CommunicationView({
         <div className="divide-y divide-[#29313a] px-6">
           {visiblePosts.map((post) => (
             <article
-              className="relative cursor-pointer py-5 transition-colors hover:bg-[#151b21]"
+              className={`relative cursor-pointer border-l-2 py-5 pl-4 transition-colors hover:bg-[#151b21] ${post.kind === "feedback" ? "border-[#58cfff]" : "border-[#65717a]"}`}
               key={post.id}
               role="button"
               tabIndex={0}
@@ -150,7 +156,15 @@ export function CommunicationView({
                       ? `Feedback para ${recipientName(post.recipientId)}`
                       : "Aviso do time"}
                   </span>
-                  <h3 className="mt-3 text-base font-bold">{post.title}</h3>
+                  <div className="mt-3 flex items-center gap-2">
+                    {!isPostRead(post) && (
+                      <i
+                        className="size-2 shrink-0 rounded-full bg-[#58cfff]"
+                        aria-label="Não lida"
+                      />
+                    )}
+                    <h3 className="text-base font-bold">{post.title}</h3>
+                  </div>
                 </div>
                 {isAdmin && (
                   <button
@@ -167,6 +181,40 @@ export function CommunicationView({
               <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#c5d0d7]">
                 {post.message}
               </p>
+              <p className="mt-3 text-xs font-medium text-[#8fa1ad]">
+                {post.kind === "feedback"
+                  ? `Orientação individual para ${recipientName(post.recipientId)}.`
+                  : "Comunicado disponível para todo o time."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  className="text-xs font-semibold text-[#83dfff] hover:text-white"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpen(post);
+                  }}
+                >
+                  {post.kind === "feedback" ? "Abrir feedback" : "Ler aviso"}
+                </button>
+                <button
+                  className="text-xs font-semibold text-[#aebbc4] hover:text-white"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleRead(post, !isPostRead(post));
+                  }}
+                >
+                  {isPostRead(post) ? "Marcar como não lida" : "Marcar como lida"}
+                </button>
+                <button
+                  className="text-xs font-semibold text-[#aebbc4] hover:text-white"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onHide(post);
+                  }}
+                >
+                  Ocultar para mim
+                </button>
+              </div>
               <small className="mt-3 block text-xs text-[#82909b]">
                 Comissão técnica ·{" "}
                 {format(parseISO(post.createdAt), "dd MMM · HH:mm", { locale: ptBR })}
@@ -187,17 +235,28 @@ export function CommunicationView({
 export function PostModal({
   post,
   roster,
+  isRead,
   onClose,
+  onHide,
+  onMarkUnread,
 }: {
   post: TeamPost;
   roster: Member[];
+  isRead: boolean;
   onClose: () => void;
+  onHide: () => void;
+  onMarkUnread: () => void;
 }) {
   const recipient = post.recipientId
     ? roster.find((member) => member.id === post.recipientId)?.name
     : null;
   return (
-    <div className="overlay !fixed !inset-0 !z-50 !flex !items-center !justify-center bg-black/80 p-5 backdrop-blur-sm">
+    <div
+      className="overlay !fixed !inset-0 !z-50 !flex !items-center !justify-center bg-black/80 p-5 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <section
         className="w-[min(620px,calc(100vw-40px))] rounded-2xl border border-[#313943] bg-[#111419] shadow-2xl"
         role="dialog"
@@ -233,6 +292,22 @@ export function PostModal({
             Comissão técnica ·{" "}
             {format(parseISO(post.createdAt), "dd MMMM yyyy · HH:mm", { locale: ptBR })}
           </p>
+          <div className="mt-6 flex flex-wrap gap-3 border-t border-[#283039] pt-5">
+            {isRead && (
+              <button
+                className="text-xs font-semibold text-[#83dfff] hover:text-white"
+                onClick={onMarkUnread}
+              >
+                Marcar como não lida
+              </button>
+            )}
+            <button
+              className="text-xs font-semibold text-[#aebbc4] hover:text-white"
+              onClick={onHide}
+            >
+              Ocultar para mim
+            </button>
+          </div>
         </div>
       </section>
     </div>

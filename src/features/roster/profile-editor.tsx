@@ -121,7 +121,12 @@ export function ProfileEditor({
     reader.readAsDataURL(file);
   };
   return (
-    <div className="overlay !fixed !inset-0 !z-50 !flex !items-center !justify-center bg-black/80 p-5 backdrop-blur-sm">
+    <div
+      className="overlay !fixed !inset-0 !z-50 !flex !items-center !justify-center bg-black/80 p-5 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <section
         className="modal profile-modal !w-[min(900px,calc(100vw-40px))] !max-w-none max-h-[90vh] overflow-y-auto rounded-2xl border border-[#313943] bg-[#111419] shadow-2xl"
         role="dialog"
