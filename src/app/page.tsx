@@ -31,6 +31,7 @@ import {
   hideTeamPostForMember,
   isTeamPostReadByMember,
   isTeamPostList,
+  markAllTeamPostsRead,
   markTeamPostRead,
   normalizeTeamPosts,
   seedTeamPosts,
@@ -351,6 +352,9 @@ export default function Home() {
     const updated = markTeamPostRead(post, actor.id, read);
     savePosts(posts.map((item) => (item.id === post.id ? updated : item)));
     if (selectedPost?.id === post.id) setSelectedPost(updated);
+  };
+  const markAllNotificationsRead = () => {
+    savePosts(markAllTeamPostsRead(notificationPosts, actor.id));
   };
   const openPost = (post: TeamPost) => {
     const updated = markTeamPostRead(post, actor.id, true);
@@ -729,27 +733,28 @@ export default function Home() {
                     <strong className="text-sm text-[#edf5f8]">Notificações</strong>
                     <button
                       className="text-xs font-semibold text-[#83dfff] hover:text-white"
-                      onClick={() => {
-                        setNotificationsOpen(false);
-                        setActiveView("communication");
-                      }}
+                      disabled={!unreadNotificationCount}
+                      onClick={markAllNotificationsRead}
                     >
-                      Ver todas
+                      Marcar todas como lidas
                     </button>
                   </div>
                   <div className="max-h-[360px] overflow-y-auto">
                     {notificationPosts.slice(0, 6).map((post) => (
-                      <button
+                      <article
                         key={post.id}
                         className={`block w-full border-b border-[#29313a] px-4 py-3 text-left transition-colors last:border-0 hover:bg-[#192129] ${isTeamPostReadByMember(post, actor.id) ? "bg-transparent" : "bg-[#17232c]"}`}
-                        onMouseEnter={() => {
-                          if (!isTeamPostReadByMember(post, actor.id)) {
-                            setPostRead(post, true);
-                          }
-                        }}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => {
                           openPost(post);
                           setNotificationsOpen(false);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            openPost(post);
+                            setNotificationsOpen(false);
+                          }
                         }}
                       >
                         <span className="flex items-center gap-2 truncate text-sm font-bold text-[#e8f1f5]">
@@ -761,7 +766,16 @@ export default function Home() {
                         <span className="mt-1 block truncate text-xs text-[#9daab4]">
                           {post.message}
                         </span>
-                      </button>
+                        <button
+                          className="mt-2 text-xs font-semibold text-[#aebbc4] hover:text-white"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            requestHidePost(post);
+                          }}
+                        >
+                          Excluir da minha lista
+                        </button>
+                      </article>
                     ))}
                     {!notificationPosts.length && (
                       <p className="px-4 py-8 text-center text-sm text-[#91a1ad]">

@@ -21,6 +21,7 @@ import {
   canDeleteTeamPost,
   hideTeamPostForMember,
   isTeamPostReadByMember,
+  markAllTeamPostsRead,
   markTeamPostRead,
   seedTeamPosts,
 } from "../src/domain/communication.ts";
@@ -266,4 +267,18 @@ test("leitura e ocultação de comunicação são individuais", () => {
   const hidden = hideTeamPostForMember(read, "mazzola");
   assert.ok(hidden.hiddenByMemberIds.includes("mazzola"));
   assert.equal(hidden.hiddenByMemberIds.includes("coach-demo"), false);
+});
+
+test("marcar todas como lidas não altera recibos de outros integrantes", () => {
+  const posts = seedTeamPosts();
+  const updated = markAllTeamPostsRead(posts, "mazzola");
+
+  assert.equal(
+    updated.every((post) => isTeamPostReadByMember(post, "mazzola")),
+    true,
+  );
+  assert.equal(
+    updated.some((post) => isTeamPostReadByMember(post, "coach-demo")),
+    false,
+  );
 });

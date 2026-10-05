@@ -38,6 +38,10 @@ export function markTeamPostRead(
   return { ...post, readByMemberIds };
 }
 
+export function markAllTeamPostsRead(posts: TeamPost[], memberId: string) {
+  return posts.map((post) => markTeamPostRead(post, memberId, true));
+}
+
 export function hideTeamPostForMember(post: TeamPost, memberId: string): TeamPost {
   return {
     ...post,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -38,6 +38,17 @@ export function CommunicationView({
   const [recipientId, setRecipientId] = useState("");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [contextPostId, setContextPostId] = useState<string | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const closeContextMenu = (event: MouseEvent) => {
+      if (!contextMenuRef.current?.contains(event.target as Node)) {
+        setContextPostId(null);
+      }
+    };
+    document.addEventListener("mousedown", closeContextMenu);
+    return () => document.removeEventListener("mousedown", closeContextMenu);
+  }, []);
   const visiblePosts = posts
     .filter(
       (post) =>
@@ -146,6 +157,10 @@ export function CommunicationView({
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") onOpen(post);
               }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setContextPostId(post.id);
+              }}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -200,21 +215,39 @@ export function CommunicationView({
                   className="text-xs font-semibold text-[#aebbc4] hover:text-white"
                   onClick={(event) => {
                     event.stopPropagation();
-                    onToggleRead(post, !isPostRead(post));
-                  }}
-                >
-                  {isPostRead(post) ? "Marcar como não lida" : "Marcar como lida"}
-                </button>
-                <button
-                  className="text-xs font-semibold text-[#aebbc4] hover:text-white"
-                  onClick={(event) => {
-                    event.stopPropagation();
                     onHide(post);
                   }}
                 >
-                  Ocultar para mim
+                  Excluir da minha lista
                 </button>
               </div>
+              {contextPostId === post.id && (
+                <div
+                  ref={contextMenuRef}
+                  className="absolute right-3 top-3 z-10 grid min-w-52 gap-1 rounded-lg border border-[#303942] bg-[#151a20] p-1 shadow-xl"
+                  role="menu"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <button
+                    className="rounded-md px-3 py-2 text-left text-xs font-semibold text-[#dbe7ed] hover:bg-[#24313a]"
+                    onClick={() => {
+                      onToggleRead(post, !isPostRead(post));
+                      setContextPostId(null);
+                    }}
+                  >
+                    {isPostRead(post) ? "Marcar como não lida" : "Marcar como lida"}
+                  </button>
+                  <button
+                    className="rounded-md px-3 py-2 text-left text-xs font-semibold text-[#dbe7ed] hover:bg-[#24313a]"
+                    onClick={() => {
+                      onHide(post);
+                      setContextPostId(null);
+                    }}
+                  >
+                    Excluir da minha lista
+                  </button>
+                </div>
+              )}
               <small className="mt-3 block text-xs text-[#82909b]">
                 Comissão técnica ·{" "}
                 {format(parseISO(post.createdAt), "dd MMM · HH:mm", { locale: ptBR })}
@@ -305,7 +338,7 @@ export function PostModal({
               className="text-xs font-semibold text-[#aebbc4] hover:text-white"
               onClick={onHide}
             >
-              Ocultar para mim
+              Excluir da minha lista
             </button>
           </div>
         </div>
