@@ -43,6 +43,7 @@ import {
   PostContextMenu,
   type PostContextMenuState,
 } from "@/components/post-context-menu";
+import { VideoEmbed } from "@/components/video-embed";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarDays,
@@ -78,6 +79,7 @@ import { TrainingEditor } from "@/features/trainings/training-editor";
 import { ProfileEditor } from "@/features/roster/profile-editor";
 import { readStoredText, readStoredValue, writeStoredValue } from "@/lib/demo-store";
 import { getContextMenuPosition } from "@/lib/context-menu";
+import { getVideoEmbedUrl } from "@/lib/video-embed";
 const STORAGE = "ghosts-demo-v1";
 const ROSTER_STORAGE = "ghosts-demo-roster-v1";
 const VIEW_STORAGE = "ghosts-demo-view-v1";
@@ -936,7 +938,7 @@ export default function Home() {
               <div className="grid gap-3 p-5">
                 {exercises.length ? (
                   exercises.map((exercise) => (
-                    <article className="activity-row" key={exercise.id}>
+                    <article className="activity-row !flex-col" key={exercise.id}>
                       <div>
                         <strong>{exercise.drill}</strong>
                         <p>
@@ -968,6 +970,12 @@ export default function Home() {
                             </button>
                           )}
                         </div>
+                      )}
+                      {exercise.videoUrl && (
+                        <VideoEmbed
+                          url={exercise.videoUrl}
+                          title={`Vídeo de referência: ${exercise.drill}`}
+                        />
                       )}
                     </article>
                   ))
@@ -1272,7 +1280,7 @@ export default function Home() {
                         </span>
                       </div>
                       {current.activities.map((activity) => (
-                        <article className="activity-row" key={activity.id}>
+                        <article className="activity-row !flex-col" key={activity.id}>
                           <div>
                             <strong>{activity.drill}</strong>
                             <p>
@@ -1288,13 +1296,10 @@ export default function Home() {
                             </small>
                           </div>
                           {activity.videoUrl && (
-                            <a
-                              href={activity.videoUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Ver vídeo ↗
-                            </a>
+                            <VideoEmbed
+                              url={activity.videoUrl}
+                              title={`Vídeo de referência: ${activity.drill}`}
+                            />
                           )}
                         </article>
                       ))}
@@ -1891,7 +1896,7 @@ export default function Home() {
                     setExerciseSubmitted(true);
                     const hasInvalidVideo =
                       exerciseDraft.videoUrl.trim() &&
-                      !/^https?:\/\//i.test(exerciseDraft.videoUrl.trim());
+                      !getVideoEmbedUrl(exerciseDraft.videoUrl);
                     setExerciseVideoError(Boolean(hasInvalidVideo));
                     if (
                       !exerciseDraft.drill.trim() ||

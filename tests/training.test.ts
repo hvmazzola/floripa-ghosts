@@ -19,6 +19,7 @@ import {
 } from "../src/domain/training.ts";
 import {
   canDeleteTeamPost,
+  createTeamPost,
   hideTeamPostForMember,
   isTeamPostReadByMember,
   markAllTeamPostsRead,
@@ -26,6 +27,7 @@ import {
   seedTeamPosts,
 } from "../src/domain/communication.ts";
 import { getContextMenuPosition } from "../src/lib/context-menu.ts";
+import { getVideoEmbedUrl } from "../src/lib/video-embed.ts";
 const input = {
   title: "Treino",
   eventTag: "Pré-campeonato",
@@ -292,5 +294,42 @@ test("menu de contexto fica próximo ao clique sem sair da janela", () => {
   assert.deepEqual(
     getContextMenuPosition({ x: 2, y: 3 }, { width: 1200, height: 800 }),
     { x: 8, y: 8 },
+  );
+});
+
+test("aceita links de vídeo do YouTube e Vimeo para reprodução embutida", () => {
+  assert.equal(
+    getVideoEmbedUrl("https://www.youtube.com/watch?v=QdBZY2fkU-0"),
+    "https://www.youtube-nocookie.com/embed/QdBZY2fkU-0",
+  );
+  assert.equal(
+    getVideoEmbedUrl("https://vimeo.com/123456789"),
+    "https://player.vimeo.com/video/123456789",
+  );
+  assert.equal(getVideoEmbedUrl("https://example.com/video"), null);
+});
+
+test("feedback pode manter vídeo de referência e rejeita provedores não suportados", () => {
+  const roster = seedMembers();
+  const feedback = createTeamPost(
+    {
+      kind: "feedback",
+      recipientId: "mazzola",
+      title: "Ajuste de rota",
+      message: "Observe a troca de direção.",
+      videoUrl: "https://youtu.be/QdBZY2fkU-0",
+    },
+    "coach",
+    "coach-demo",
+    roster,
+  );
+  assert.equal(feedback.videoUrl, "https://youtu.be/QdBZY2fkU-0");
+  assert.throws(() =>
+    createTeamPost(
+      { ...feedback, videoUrl: "https://example.com/video" },
+      "coach",
+      "coach-demo",
+      roster,
+    ),
   );
 });

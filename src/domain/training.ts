@@ -1,3 +1,5 @@
+import { getVideoEmbedUrl } from "../lib/video-embed.ts";
+
 export type Role = "coach" | "athlete";
 export type RSVP = "pending" | "yes" | "no";
 export type Attendance = "unmarked" | "present" | "absent";
@@ -316,8 +318,8 @@ function normalizedInput(input: TrainingInput, roster: Member[] = members) {
       Number(activity.durationMinutes) > 300
     )
       throw new Error("A duração de cada atividade deve ficar entre 1 e 300 minutos.");
-    if (activity.videoUrl.trim() && !/^https?:\/\//i.test(activity.videoUrl.trim()))
-      throw new Error("Use um link válido para o vídeo de referência.");
+    if (activity.videoUrl.trim() && !getVideoEmbedUrl(activity.videoUrl))
+      throw new Error("Use um link do YouTube ou Vimeo para o vídeo de referência.");
     return {
       ...activity,
       id: activity.id || crypto.randomUUID(),

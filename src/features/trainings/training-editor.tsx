@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { activityTypeLabel, emptyActivity, unitLabel } from "@/domain/training";
+import { getVideoEmbedUrl } from "@/lib/video-embed";
 import type {
   ActivityType,
   Member,
@@ -247,9 +248,7 @@ export function TrainingEditor({
         !Number.isInteger(Number(activity.durationMinutes)) ||
         Number(activity.durationMinutes) < 1 ||
         Number(activity.durationMinutes) > 300,
-      video:
-        Boolean(activity.videoUrl.trim()) &&
-        !/^https?:\/\//i.test(activity.videoUrl.trim()),
+      video: Boolean(activity.videoUrl.trim()) && !getVideoEmbedUrl(activity.videoUrl),
     })),
   };
   const hasInvalid =
@@ -626,7 +625,7 @@ export function TrainingEditor({
                     <span className="field-label">
                       Vídeo de referência
                       {videoErrors.includes(index) && (
-                        <span className="error"> Informe um link</span>
+                        <span className="error"> Use um link do YouTube ou Vimeo</span>
                       )}
                     </span>
                     <input
@@ -640,7 +639,7 @@ export function TrainingEditor({
                         updateActivity(index, "videoUrl", event.target.value)
                       }
                       type="url"
-                      placeholder="https://youtube.com/..."
+                      placeholder="YouTube ou Vimeo"
                     />
                   </label>
                 </div>

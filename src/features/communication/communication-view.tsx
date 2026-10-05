@@ -8,9 +8,11 @@ import {
   PostContextMenu,
   type PostContextMenuState,
 } from "@/components/post-context-menu";
+import { VideoEmbed } from "@/components/video-embed";
 import type { TeamPost, TeamPostInput } from "@/domain/communication";
 import type { Member, Role } from "@/domain/training";
 import { getContextMenuPosition } from "@/lib/context-menu";
+import { getVideoEmbedUrl } from "@/lib/video-embed";
 export function CommunicationView({
   posts,
   roster,
@@ -43,6 +45,8 @@ export function CommunicationView({
   const [recipientId, setRecipientId] = useState("");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoError, setVideoError] = useState(false);
   const [contextMenu, setContextMenu] = useState<PostContextMenuState | null>(null);
   const visiblePosts = posts
     .filter(
@@ -55,14 +59,21 @@ export function CommunicationView({
   const recipientName = (recipient: string | null) =>
     roster.find((member) => member.id === recipient)?.name ?? "Atleta";
   const submit = () => {
+    const hasInvalidVideo =
+      kind === "feedback" && Boolean(videoUrl.trim()) && !getVideoEmbedUrl(videoUrl);
+    setVideoError(hasInvalidVideo);
+    if (hasInvalidVideo) return;
     onCreate({
       kind,
       recipientId: kind === "feedback" ? recipientId : null,
       title,
       message,
+      videoUrl,
     });
     setTitle("");
     setMessage("");
+    setVideoUrl("");
+    setVideoError(false);
     setRecipientId("");
     setKind("announcement");
   };
@@ -81,7 +92,11 @@ export function CommunicationView({
               <span className="field-label">Tipo</span>
               <select
                 value={kind}
-                onChange={(event) => setKind(event.target.value as TeamPost["kind"])}
+                onChange={(event) => {
+                  setKind(event.target.value as TeamPost["kind"]);
+                  setVideoUrl("");
+                  setVideoError(false);
+                }}
               >
                 <option value="announcement">Aviso para o time</option>
                 <option value="feedback">Feedback individual</option>
@@ -119,6 +134,28 @@ export function CommunicationView({
                 placeholder="Escreva a orientação para o time ou para o atleta."
               />
             </label>
+            {kind === "feedback" && (
+              <label>
+                <span className="field-label">
+                  Vídeo de referência
+                  {videoError && (
+                    <span className="error"> Use um link do YouTube ou Vimeo</span>
+                  )}
+                </span>
+                <input
+                  className={
+                    videoError ? "!border-red-500 !ring-1 !ring-red-500/60" : undefined
+                  }
+                  type="url"
+                  value={videoUrl}
+                  onChange={(event) => {
+                    setVideoUrl(event.target.value);
+                    setVideoError(false);
+                  }}
+                  placeholder="YouTube ou Vimeo"
+                />
+              </label>
+            )}
             <button
               className="primary justify-self-start"
               disabled={
@@ -304,6 +341,17 @@ export function PostModal({
           <p className="whitespace-pre-wrap text-sm leading-7 text-[#d4dde3]">
             {post.message}
           </p>
+          {post.kind === "feedback" && post.videoUrl && (
+            <div className="mt-6">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#8fe0ff]">
+                Vídeo de referência
+              </p>
+              <VideoEmbed
+                url={post.videoUrl}
+                title={`Vídeo de referência: ${post.title}`}
+              />
+            </div>
+          )}
           <p className="mt-6 text-xs text-[#82909b]">
             Comissão técnica ·{" "}
             {format(parseISO(post.createdAt), "dd MMMM yyyy · HH:mm", { locale: ptBR })}
