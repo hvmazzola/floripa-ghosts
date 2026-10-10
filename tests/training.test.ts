@@ -314,7 +314,7 @@ test("feedback pode manter vídeo de referência e rejeita provedores não supor
   const feedback = createTeamPost(
     {
       kind: "feedback",
-      recipientId: "mazzola",
+      recipientIds: ["mazzola"],
       title: "Ajuste de rota",
       message: "Observe a troca de direção.",
       videoUrl: "https://youtu.be/QdBZY2fkU-0",
@@ -327,6 +327,37 @@ test("feedback pode manter vídeo de referência e rejeita provedores não supor
   assert.throws(() =>
     createTeamPost(
       { ...feedback, videoUrl: "https://example.com/video" },
+      "coach",
+      "coach-demo",
+      roster,
+    ),
+  );
+});
+
+test("feedback coletivo mantém todos os atletas escolhidos", () => {
+  const roster = seedMembers();
+  const feedback = createTeamPost(
+    {
+      kind: "feedback",
+      recipientIds: ["mazzola", "athlete-1", "mazzola"],
+      title: "Ajuste da unidade",
+      message: "Vamos revisar as leituras de cobertura.",
+      videoUrl: "",
+    },
+    "coach",
+    "coach-demo",
+    roster,
+  );
+  assert.deepEqual(feedback.recipientIds, ["mazzola", "athlete-1"]);
+  assert.throws(() =>
+    createTeamPost(
+      {
+        kind: "feedback",
+        recipientIds: ["coach-demo"],
+        title: "Destino inválido",
+        message: "Teste",
+        videoUrl: "",
+      },
       "coach",
       "coach-demo",
       roster,

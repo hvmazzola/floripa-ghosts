@@ -8,6 +8,7 @@ import {
   PostContextMenu,
   type PostContextMenuState,
 } from "@/components/post-context-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 import { VideoEmbed } from "@/components/video-embed";
 import type { TeamPost, TeamPostInput } from "@/domain/communication";
 import type { Member, Role } from "@/domain/training";
@@ -42,7 +43,7 @@ export function CommunicationView({
     (member) => member.status === "active" && member.roles.includes("athlete"),
   );
   const [kind, setKind] = useState<TeamPost["kind"]>("announcement");
-  const [recipientId, setRecipientId] = useState("");
+  const [recipientIds, setRecipientIds] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
@@ -53,11 +54,41 @@ export function CommunicationView({
       (post) =>
         role === "coach" ||
         post.kind === "announcement" ||
-        post.recipientId === actor.id,
+        post.recipientIds.includes(actor.id),
     )
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const recipientName = (recipient: string | null) =>
-    roster.find((member) => member.id === recipient)?.name ?? "Atleta";
+  const recipientLabel = (ids: string[]) => {
+    const names = ids
+      .map((id) => roster.find((member) => member.id === id)?.name)
+      .filter((name): name is string => Boolean(name));
+    if (!names.length) return "atletas";
+    return names.length === 1 ? names[0] : `${names[0]} e mais ${names.length - 1}`;
+  };
+  const toggleRecipient = (memberId: string) => {
+    setRecipientIds((current) =>
+      current.includes(memberId)
+        ? current.filter((id) => id !== memberId)
+        : [...current, memberId],
+    );
+  };
+  const toggleUnit = (unit: "Ataque" | "Defesa") => {
+    const unitMemberIds = athletes
+      .filter((athlete) => athlete.units.includes(unit))
+      .map((athlete) => athlete.id);
+    setRecipientIds((current) =>
+      unitMemberIds.every((id) => current.includes(id))
+        ? current.filter((id) => !unitMemberIds.includes(id))
+        : [...new Set([...current, ...unitMemberIds])],
+    );
+  };
+  const isUnitSelected = (unit: "Ataque" | "Defesa") => {
+    const unitMemberIds = athletes
+      .filter((athlete) => athlete.units.includes(unit))
+      .map((athlete) => athlete.id);
+    return (
+      unitMemberIds.length > 0 && unitMemberIds.every((id) => recipientIds.includes(id))
+    );
+  };
   const submit = () => {
     const hasInvalidVideo =
       kind === "feedback" && Boolean(videoUrl.trim()) && !getVideoEmbedUrl(videoUrl);
@@ -65,7 +96,7 @@ export function CommunicationView({
     if (hasInvalidVideo) return;
     onCreate({
       kind,
-      recipientId: kind === "feedback" ? recipientId : null,
+      recipientIds: kind === "feedback" ? recipientIds : [],
       title,
       message,
       videoUrl,
@@ -74,7 +105,7 @@ export function CommunicationView({
     setMessage("");
     setVideoUrl("");
     setVideoError(false);
-    setRecipientId("");
+    setRecipientIds([]);
     setKind("announcement");
   };
 
@@ -96,27 +127,58 @@ export function CommunicationView({
                   setKind(event.target.value as TeamPost["kind"]);
                   setVideoUrl("");
                   setVideoError(false);
+                  setRecipientIds([]);
                 }}
               >
                 <option value="announcement">Aviso para o time</option>
-                <option value="feedback">Feedback individual</option>
+                <option value="feedback">Feedback para atletas</option>
               </select>
             </label>
             {kind === "feedback" && (
-              <label>
-                <span className="field-label">Atleta</span>
-                <select
-                  value={recipientId}
-                  onChange={(event) => setRecipientId(event.target.value)}
-                >
-                  <option value="">Selecione um atleta</option>
+              <fieldset className="selection-panel">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <legend className="field-label">
+                    Destinatários{" "}
+                    <span
+                      className={`required-mark ${recipientIds.length ? "!text-[#8b949e]" : ""}`}
+                    >
+                      *
+                    </span>
+                  </legend>
+                  <div className="flex gap-2">
+                    {(["Ataque", "Defesa"] as const).map((unit) => (
+                      <button
+                        className={`secondary !px-3 !py-1.5 !text-xs ${isUnitSelected(unit) ? "!border-[#2eb8ff] !bg-[#173447] !text-[#dff6ff]" : ""}`}
+                        key={unit}
+                        type="button"
+                        onClick={() => toggleUnit(unit)}
+                      >
+                        {unit}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-[#91a1ad]">
+                  Selecione atletas ou uma unidade inteira.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {athletes.map((athlete) => (
-                    <option key={athlete.id} value={athlete.id}>
-                      {athlete.name}
-                    </option>
+                    <label
+                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-[#303740] bg-[#0b0d10] px-3 py-2 text-sm text-[#e7f0f4] transition-colors hover:border-[#3d7795]"
+                      key={athlete.id}
+                    >
+                      <Checkbox
+                        checked={recipientIds.includes(athlete.id)}
+                        onCheckedChange={() => toggleRecipient(athlete.id)}
+                      />
+                      <span className="min-w-0 flex-1 truncate font-semibold">
+                        {athlete.name}
+                      </span>
+                      <span className="text-xs text-[#91a1ad]">{athlete.units}</span>
+                    </label>
                   ))}
-                </select>
-              </label>
+                </div>
+              </fieldset>
             )}
             <label>
               <span className="field-label">Título</span>
@@ -161,7 +223,7 @@ export function CommunicationView({
               disabled={
                 !title.trim() ||
                 !message.trim() ||
-                (kind === "feedback" && !recipientId)
+                (kind === "feedback" && !recipientIds.length)
               }
               onClick={submit}
             >
@@ -206,7 +268,7 @@ export function CommunicationView({
                     className={`rounded-full px-2 py-1 text-[10px] font-bold ${post.kind === "feedback" ? "bg-[#183447] text-[#8fe0ff]" : "bg-[#252b31] text-[#cbd5dc]"}`}
                   >
                     {post.kind === "feedback"
-                      ? `Feedback para ${recipientName(post.recipientId)}`
+                      ? `Feedback para ${recipientLabel(post.recipientIds)}`
                       : "Aviso do time"}
                   </span>
                   <div className="mt-3 flex items-center gap-2">
@@ -247,7 +309,7 @@ export function CommunicationView({
               </p>
               <p className="mt-3 text-xs font-medium text-[#8fa1ad]">
                 {post.kind === "feedback"
-                  ? `Orientação individual para ${recipientName(post.recipientId)}.`
+                  ? `Orientação para ${recipientLabel(post.recipientIds)}.`
                   : "Comunicado disponível para todo o time."}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -300,9 +362,15 @@ export function PostModal({
   onHide: () => void;
   onMarkUnread: () => void;
 }) {
-  const recipient = post.recipientId
-    ? roster.find((member) => member.id === post.recipientId)?.name
-    : null;
+  const recipients = post.recipientIds
+    .map((id) => roster.find((member) => member.id === id)?.name)
+    .filter((name): name is string => Boolean(name));
+  const recipientLabel =
+    recipients.length === 1
+      ? recipients[0]
+      : recipients.length
+        ? `${recipients[0]} e mais ${recipients.length - 1}`
+        : "atletas";
   return (
     <div
       className="overlay !fixed !inset-0 !z-50 !flex !items-center !justify-center bg-black/80 p-5 backdrop-blur-sm"
@@ -322,7 +390,7 @@ export function PostModal({
               className={`rounded-full px-2 py-1 text-[10px] font-bold ${post.kind === "feedback" ? "bg-[#183447] text-[#8fe0ff]" : "bg-[#252b31] text-[#cbd5dc]"}`}
             >
               {post.kind === "feedback"
-                ? `Feedback para ${recipient ?? "atleta"}`
+                ? `Feedback para ${recipientLabel}`
                 : "Aviso do time"}
             </span>
             <h2 className="mt-4 text-xl font-bold" id="post-modal-title">

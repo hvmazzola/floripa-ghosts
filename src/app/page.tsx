@@ -346,7 +346,7 @@ export default function Home() {
       (post) =>
         role === "coach" ||
         post.kind === "announcement" ||
-        post.recipientId === actor.id,
+        post.recipientIds.includes(actor.id),
     )
     .filter((post) => !post.hiddenByMemberIds.includes(actor.id))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
