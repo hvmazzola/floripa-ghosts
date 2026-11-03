@@ -35,6 +35,13 @@ import {
   normalizeTeamPosts,
   seedTeamPosts,
 } from "@/domain/communication";
+import {
+  createPersonalTraining,
+  isPersonalTrainingList,
+  seedPersonalTrainings,
+  togglePersonalTrainingReaction,
+  updatePersonalTraining,
+} from "@/domain/personal-training";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -53,6 +60,7 @@ import {
   House,
   Menu,
   MessageCircle,
+  Dumbbell,
   Plus,
   UsersRound,
 } from "lucide-react";
@@ -70,6 +78,11 @@ import type {
   Unit,
 } from "@/domain/training";
 import type { TeamPost, TeamPostInput } from "@/domain/communication";
+import type {
+  PersonalTraining,
+  PersonalTrainingInput,
+  PersonalTrainingReaction,
+} from "@/domain/personal-training";
 import {
   CommunicationView,
   PostModal,
@@ -77,6 +90,7 @@ import {
 import { Dashboard, TrainingCalendar } from "@/features/dashboard/dashboard-view";
 import { TrainingEditor } from "@/features/trainings/training-editor";
 import { ProfileEditor } from "@/features/roster/profile-editor";
+import { PersonalTrainingsView } from "@/features/personal-trainings/personal-trainings-view";
 import { readStoredText, readStoredValue, writeStoredValue } from "@/lib/demo-store";
 import { getContextMenuPosition } from "@/lib/context-menu";
 import { getVideoEmbedUrl } from "@/lib/video-embed";
@@ -87,6 +101,7 @@ const ROLE_STORAGE = "ghosts-demo-role-v1";
 const SELECTED_STORAGE = "ghosts-demo-selected-training-v1";
 const EXERCISE_STORAGE = "ghosts-demo-exercises-v1";
 const COMMUNICATION_STORAGE = "ghosts-demo-communication-v1";
+const PERSONAL_TRAINING_STORAGE = "ghosts-demo-personal-trainings-v1";
 const ATHLETE_ID = "mazzola";
 const COACH_ID = "coach-demo";
 const rsvpLabel: Record<RSVP, string> = {
@@ -100,6 +115,14 @@ const attendanceLabel: Record<Attendance, string> = {
   absent: "Ausente",
 };
 type Feedback = { kind: "success" | "error"; message: string };
+type AppView =
+  | "dashboard"
+  | "trainings"
+  | "personal-trainings"
+  | "roster"
+  | "profile"
+  | "exercises"
+  | "communication";
 
 function isActivityList(value: unknown): value is TrainingActivity[] {
   return (
@@ -163,11 +186,10 @@ function FeedbackToast({
 
 export default function Home() {
   const [role, setRole] = useState<Role>("coach");
-  const [view, setView] = useState<
-    "dashboard" | "trainings" | "roster" | "profile" | "exercises" | "communication"
-  >("dashboard");
+  const [view, setView] = useState<AppView>("dashboard");
   const [exercises, setExercises] = useState<TrainingActivity[]>([]);
   const [posts, setPosts] = useState<TeamPost[]>([]);
+  const [personalTrainings, setPersonalTrainings] = useState<PersonalTraining[]>([]);
   const [exerciseDraft, setExerciseDraft] = useState<TrainingActivity | null>(null);
   const [exerciseSubmitted, setExerciseSubmitted] = useState(false);
   const [exerciseVideoError, setExerciseVideoError] = useState(false);
@@ -189,10 +211,7 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
-  const setActiveView = (
-    next:
-      "dashboard" | "trainings" | "roster" | "profile" | "exercises" | "communication",
-  ) => {
+  const setActiveView = (next: AppView) => {
     setView(next);
     writeStoredValue(localStorage, VIEW_STORAGE, next);
   };
@@ -237,6 +256,7 @@ export default function Home() {
         [
           "dashboard",
           "trainings",
+          "personal-trainings",
           "roster",
           "profile",
           "exercises",
@@ -268,6 +288,18 @@ export default function Home() {
     const initialPosts = normalizeTeamPosts(storedPosts.value);
     setPosts(initialPosts);
     writeStoredValue(localStorage, COMMUNICATION_STORAGE, initialPosts);
+    const storedPersonalTrainings = readStoredValue(
+      localStorage,
+      PERSONAL_TRAINING_STORAGE,
+      isPersonalTrainingList,
+      seedPersonalTrainings(),
+    );
+    setPersonalTrainings(storedPersonalTrainings.value);
+    writeStoredValue(
+      localStorage,
+      PERSONAL_TRAINING_STORAGE,
+      storedPersonalTrainings.value,
+    );
     const storedTrainings = readStoredValue(localStorage, STORAGE, Array.isArray, []);
     const migrated = migrateTrainingList(storedTrainings.value, initialRoster);
     const initial = (migrated ?? seedTrainings()).map((training) => ({
@@ -303,6 +335,7 @@ export default function Home() {
       storedRoster.recovered ||
       storedExercises.recovered ||
       storedPosts.recovered ||
+      storedPersonalTrainings.recovered ||
       storedTrainings.recovered
     ) {
       setNotice("Armazenamento indisponível. Os dados ficarão nesta sessão.");
@@ -541,6 +574,69 @@ export default function Home() {
       },
     });
   };
+  const savePersonalTrainings = (next: PersonalTraining[]) => {
+    setPersonalTrainings(next);
+    writeStoredValue(localStorage, PERSONAL_TRAINING_STORAGE, next);
+  };
+  const createPersonalTrainingEntry = (input: PersonalTrainingInput) => {
+    try {
+      const training = createPersonalTraining(input, actor, roster);
+      savePersonalTrainings([training, ...personalTrainings]);
+      showFeedback("Treino pessoal publicado na timeline.", "success");
+      return true;
+    } catch (error) {
+      showFeedback(
+        error instanceof Error ? error.message : "Não foi possível registrar o treino.",
+        "error",
+      );
+      return false;
+    }
+  };
+  const updatePersonalTrainingEntry = (
+    training: PersonalTraining,
+    input: PersonalTrainingInput,
+  ) => {
+    try {
+      const updated = updatePersonalTraining(training, input, actor);
+      savePersonalTrainings(
+        personalTrainings.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      showFeedback("Treino pessoal atualizado.", "success");
+      return true;
+    } catch (error) {
+      showFeedback(
+        error instanceof Error ? error.message : "Não foi possível atualizar o treino.",
+        "error",
+      );
+      return false;
+    }
+  };
+  const deletePersonalTrainingEntry = (training: PersonalTraining) => {
+    if (training.authorId !== actor.id) {
+      showFeedback("Você só pode excluir seus próprios treinos pessoais.", "error");
+      return;
+    }
+    setConfirmation({
+      title: "Excluir treino pessoal?",
+      description: `“${training.title}” sairá da timeline do time.`,
+      confirmLabel: "Excluir",
+      onConfirm: () => {
+        savePersonalTrainings(
+          personalTrainings.filter((item) => item.id !== training.id),
+        );
+        showFeedback("Treino pessoal excluído.", "success");
+      },
+    });
+  };
+  const reactToPersonalTraining = (
+    training: PersonalTraining,
+    reaction: PersonalTrainingReaction,
+  ) => {
+    const updated = togglePersonalTrainingReaction(training, actor.id, reaction);
+    savePersonalTrainings(
+      personalTrainings.map((item) => (item.id === updated.id ? updated : item)),
+    );
+  };
   const confirmed =
     current?.invitations.filter((invitation) => invitation.rsvp === "yes").length ?? 0;
   const actual =
@@ -610,6 +706,26 @@ export default function Home() {
               className={`whitespace-nowrap text-[13px] font-bold transition-[max-width,opacity,transform] duration-300 ease-out motion-reduce:transition-none ${sidebarOpen ? "max-w-40 translate-x-0 opacity-100" : "max-w-0 -translate-x-2 opacity-0"}`}
             >
               Treinos e agenda
+            </span>
+          </button>
+          <button
+            className={`flex h-12 items-center overflow-hidden rounded-[10px] text-left transition-colors focus-visible:outline focus-visible:outline-3 focus-visible:outline-[#2eb8ff] ${view === "personal-trainings" ? "bg-[#17232c] text-[#f4f8fb] shadow-[inset_3px_0_#2eb8ff]" : "text-[#98a3ad] hover:bg-[#151d24] hover:text-[#eaf4f9]"}`}
+            aria-label="Timeline"
+            onClick={() => setActiveView("personal-trainings")}
+          >
+            <span className="grid h-12 w-12 min-w-12 place-items-center">
+              <Dumbbell
+                className={
+                  view === "personal-trainings" ? "text-[#58cfff]" : "text-[#8a97a2]"
+                }
+                size={19}
+                strokeWidth={1.8}
+              />
+            </span>
+            <span
+              className={`whitespace-nowrap text-[13px] font-bold transition-[max-width,opacity,transform] duration-300 ease-out motion-reduce:transition-none ${sidebarOpen ? "max-w-40 translate-x-0 opacity-100" : "max-w-0 -translate-x-2 opacity-0"}`}
+            >
+              Timeline
             </span>
           </button>
           <button
@@ -717,13 +833,15 @@ export default function Home() {
                 ? "Home"
                 : view === "trainings"
                   ? "Treinos e agenda"
-                  : view === "roster"
-                    ? "Elenco"
-                    : view === "exercises"
-                      ? "Exercícios"
-                      : view === "communication"
-                        ? "Comunicação"
-                        : "Meu perfil"}
+                  : view === "personal-trainings"
+                    ? "Timeline"
+                    : view === "roster"
+                      ? "Elenco"
+                      : view === "exercises"
+                        ? "Exercícios"
+                        : view === "communication"
+                          ? "Comunicação"
+                          : "Meu perfil"}
             </span>
           </nav>
           <div className="relative flex items-center gap-3">
@@ -860,26 +978,30 @@ export default function Home() {
                   ? "Dashboard"
                   : view === "trainings"
                     ? "Treinos"
-                    : view === "roster"
-                      ? "Pessoas"
-                      : view === "exercises"
-                        ? "Exercícios"
-                        : view === "communication"
-                          ? "Comunicação"
-                          : "Perfil"}
+                    : view === "personal-trainings"
+                      ? "Timeline"
+                      : view === "roster"
+                        ? "Pessoas"
+                        : view === "exercises"
+                          ? "Exercícios"
+                          : view === "communication"
+                            ? "Comunicação"
+                            : "Perfil"}
               </h1>
               <p className="subtitle">
                 {view === "dashboard"
                   ? "Acompanhe a rotina do time com dados de treinos já registrados."
                   : view === "trainings"
                     ? "Seu ponto de encontro para planejar, participar e acompanhar."
-                    : view === "roster"
-                      ? "Um elenco, diferentes posições. A mesma direção."
-                      : view === "exercises"
-                        ? "Templates prontos para acelerar o planejamento."
-                        : view === "communication"
-                          ? "Avisos do time e feedbacks que ajudam a evoluir juntos."
-                          : "Seus dados esportivos e sua atuação no time."}
+                    : view === "personal-trainings"
+                      ? "Treinos pessoais e consistência compartilhados com o time."
+                      : view === "roster"
+                        ? "Um elenco, diferentes posições. A mesma direção."
+                        : view === "exercises"
+                          ? "Templates prontos para acelerar o planejamento."
+                          : view === "communication"
+                            ? "Avisos do time e feedbacks que ajudam a evoluir juntos."
+                            : "Seus dados esportivos e sua atuação no time."}
               </p>
             </div>
             {role === "coach" && view === "trainings" && (
@@ -900,6 +1022,16 @@ export default function Home() {
                 selectTraining(trainingId);
                 setActiveView("trainings");
               }}
+            />
+          ) : view === "personal-trainings" ? (
+            <PersonalTrainingsView
+              trainings={personalTrainings}
+              roster={roster}
+              actor={actor}
+              onCreate={createPersonalTrainingEntry}
+              onUpdate={updatePersonalTrainingEntry}
+              onDelete={deletePersonalTrainingEntry}
+              onReact={reactToPersonalTraining}
             />
           ) : view === "communication" ? (
             <CommunicationView

@@ -1,0 +1,368 @@
+"use client";
+
+import { useState } from "react";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Dumbbell } from "lucide-react";
+
+import {
+  personalTrainingCategories,
+  personalTrainingCategoryLabel,
+  type PersonalTraining,
+  type PersonalTrainingInput,
+  type PersonalTrainingReaction,
+} from "@/domain/personal-training";
+import type { Member } from "@/domain/training";
+
+const reactions: Array<{ value: PersonalTrainingReaction; label: string }> = [
+  { value: "💪", label: "Força" },
+  { value: "🔥", label: "Fogo" },
+  { value: "👏", label: "Aplausos" },
+];
+
+function blankInput(): PersonalTrainingInput {
+  return {
+    category: "gym",
+    title: "",
+    occurredAt: new Date().toISOString().slice(0, 16),
+    durationMinutes: 45,
+    perceivedLoad: 5,
+    notes: "",
+  };
+}
+
+function toLocalInput(value: string) {
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+}
+
+function PersonalTrainingEditor({
+  training,
+  onClose,
+  onSave,
+}: {
+  training: PersonalTraining | null;
+  onClose: () => void;
+  onSave: (input: PersonalTrainingInput) => boolean;
+}) {
+  const [input, setInput] = useState<PersonalTrainingInput>(() =>
+    training
+      ? {
+          category: training.category,
+          title: training.title,
+          occurredAt: toLocalInput(training.occurredAt),
+          durationMinutes: training.durationMinutes,
+          perceivedLoad: training.perceivedLoad,
+          notes: training.notes,
+        }
+      : blankInput(),
+  );
+  const [submitted, setSubmitted] = useState(false);
+  const invalid = {
+    title: !input.title.trim(),
+    date: !Number.isFinite(Date.parse(input.occurredAt)),
+    duration:
+      !Number.isInteger(Number(input.durationMinutes)) || input.durationMinutes < 1,
+    load:
+      !Number.isInteger(Number(input.perceivedLoad)) ||
+      input.perceivedLoad < 1 ||
+      input.perceivedLoad > 10,
+  };
+  const hasInvalid = Object.values(invalid).some(Boolean);
+  const invalidClass = "!border-red-500 !ring-1 !ring-red-500/60";
+
+  return (
+    <div
+      className="overlay !fixed !inset-0 !z-50 !flex !items-center !justify-center bg-black/80 p-5 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="w-[min(620px,calc(100vw-40px))] rounded-2xl border border-[#313943] bg-[#111419] shadow-2xl">
+        <div className="flex items-start justify-between gap-5 border-b border-[#283039] px-7 py-6 max-sm:px-5">
+          <div>
+            <p className="eyebrow">ROTINA PESSOAL</p>
+            <h2 className="mt-1 text-xl font-bold">
+              {training ? "Editar treino pessoal" : "Registrar treino pessoal"}
+            </h2>
+          </div>
+          <button
+            className="grid size-10 place-items-center rounded-full border border-[#303740] bg-[#20262c] text-2xl text-[#dbe4ea] transition-colors hover:bg-[#2a3945] hover:text-[#83dfff]"
+            aria-label="Fechar"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <div className="editor-form grid gap-4 px-7 py-6 max-sm:px-5 [&_input]:w-full [&_input]:rounded-lg [&_input]:border [&_input]:border-[#303740] [&_input]:bg-[#0b0d10] [&_input]:p-3 [&_input]:text-[#f2f5f7] [&_select]:w-full [&_select]:rounded-lg [&_select]:border [&_select]:border-[#303740] [&_select]:bg-[#0b0d10] [&_select]:p-3 [&_select]:text-[#f2f5f7] [&_textarea]:min-h-28 [&_textarea]:w-full [&_textarea]:rounded-lg [&_textarea]:border [&_textarea]:border-[#303740] [&_textarea]:bg-[#0b0d10] [&_textarea]:p-3 [&_textarea]:text-[#f2f5f7]">
+          <div className="form-grid">
+            <label>
+              <span className="field-label">Tipo</span>
+              <select
+                value={input.category}
+                onChange={(event) =>
+                  setInput((current) => ({
+                    ...current,
+                    category: event.target.value as PersonalTrainingInput["category"],
+                  }))
+                }
+              >
+                {personalTrainingCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {personalTrainingCategoryLabel[category]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="field-label">
+                Nome <span className="required-mark">*</span>
+                {submitted && invalid.title && (
+                  <span className="error"> Campo obrigatório</span>
+                )}
+              </span>
+              <input
+                className={submitted && invalid.title ? invalidClass : undefined}
+                value={input.title}
+                onChange={(event) =>
+                  setInput((current) => ({ ...current, title: event.target.value }))
+                }
+                placeholder="Ex.: Corrida de recuperação"
+              />
+            </label>
+          </div>
+          <div className="form-grid">
+            <label>
+              <span className="field-label">
+                Data e horário <span className="required-mark">*</span>
+                {submitted && invalid.date && (
+                  <span className="error"> Campo obrigatório</span>
+                )}
+              </span>
+              <input
+                className={submitted && invalid.date ? invalidClass : undefined}
+                type="datetime-local"
+                value={input.occurredAt}
+                onChange={(event) =>
+                  setInput((current) => ({
+                    ...current,
+                    occurredAt: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              <span className="field-label">
+                Duração (min) <span className="required-mark">*</span>
+                {submitted && invalid.duration && (
+                  <span className="error"> Campo obrigatório</span>
+                )}
+              </span>
+              <input
+                className={submitted && invalid.duration ? invalidClass : undefined}
+                type="number"
+                min={1}
+                value={input.durationMinutes}
+                onChange={(event) =>
+                  setInput((current) => ({
+                    ...current,
+                    durationMinutes: Number(event.target.value),
+                  }))
+                }
+              />
+            </label>
+          </div>
+          <label>
+            <span className="field-label">
+              Carga percebida (1 a 10) <span className="required-mark">*</span>
+              {submitted && invalid.load && (
+                <span className="error"> Informe de 1 a 10</span>
+              )}
+            </span>
+            <input
+              className={submitted && invalid.load ? invalidClass : undefined}
+              type="number"
+              min={1}
+              max={10}
+              value={input.perceivedLoad}
+              onChange={(event) =>
+                setInput((current) => ({
+                  ...current,
+                  perceivedLoad: Number(event.target.value),
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span className="field-label">Observação</span>
+            <textarea
+              value={input.notes}
+              onChange={(event) =>
+                setInput((current) => ({ ...current, notes: event.target.value }))
+              }
+              placeholder="Como foi o treino?"
+            />
+          </label>
+          <div className="flex justify-end gap-3 border-t border-[#283039] pt-5">
+            <button className="secondary !px-3 !py-2 !text-xs" onClick={onClose}>
+              Cancelar
+            </button>
+            <button
+              className="primary !px-3 !py-2 !text-xs"
+              onClick={() => {
+                setSubmitted(true);
+                if (!hasInvalid) onSave(input);
+              }}
+            >
+              Salvar treino
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function PersonalTrainingsView({
+  trainings,
+  roster,
+  actor,
+  onCreate,
+  onUpdate,
+  onDelete,
+  onReact,
+}: {
+  trainings: PersonalTraining[];
+  roster: Member[];
+  actor: Member;
+  onCreate: (input: PersonalTrainingInput) => boolean;
+  onUpdate: (training: PersonalTraining, input: PersonalTrainingInput) => boolean;
+  onDelete: (training: PersonalTraining) => void;
+  onReact: (training: PersonalTraining, reaction: PersonalTrainingReaction) => void;
+}) {
+  const [editing, setEditing] = useState<PersonalTraining | null | undefined>(
+    undefined,
+  );
+  const canRegister = actor.status === "active" && actor.roles.includes("athlete");
+  const sortedTrainings = [...trainings].sort(
+    (first, second) => Date.parse(second.occurredAt) - Date.parse(first.occurredAt),
+  );
+
+  return (
+    <section className="grid gap-5">
+      <section className="panel p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="eyebrow">TIMELINE DO TIME</p>
+            <h2 className="mt-1 text-xl font-bold">Rotina além do campo</h2>
+            <p className="mt-2 text-sm text-[#aebbc4]">
+              Compartilhe treinos pessoais e acompanhe a consistência do time.
+            </p>
+          </div>
+          {canRegister && (
+            <button className="primary" onClick={() => setEditing(null)}>
+              <Dumbbell size={16} /> Registrar treino pessoal
+            </button>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-4" aria-label="Timeline de treinos pessoais">
+        {sortedTrainings.map((training) => {
+          const author = roster.find((member) => member.id === training.authorId);
+          const isOwner = training.authorId === actor.id;
+          return (
+            <article className="panel p-5" key={training.id}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-full border border-[#31536a] bg-[#142630] text-sm font-bold text-[#a8e9ff]">
+                    {author?.initials ?? "AT"}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-[#eaf4f9]">
+                      {author?.name ?? "Atleta"}
+                    </p>
+                    <p className="mt-1 text-xs text-[#91a1ad]">
+                      {format(parseISO(training.occurredAt), "dd MMM · HH:mm", {
+                        locale: ptBR,
+                      })}
+                    </p>
+                  </div>
+                </div>
+                {isOwner && (
+                  <div className="flex gap-2">
+                    <button
+                      className="secondary !px-3 !py-2 !text-xs"
+                      onClick={() => setEditing(training)}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="inline-flex items-center justify-center rounded-md border border-[#B91C1C] bg-[#B91C1C] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#991B1B]"
+                      onClick={() => onDelete(training)}
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[#173447] px-2 py-1 text-[10px] font-bold text-[#8fe0ff]">
+                  {personalTrainingCategoryLabel[training.category]}
+                </span>
+                <span className="text-xs text-[#aebbc4]">
+                  {training.durationMinutes} min
+                </span>
+                <span className="text-xs text-[#aebbc4]">
+                  Carga {training.perceivedLoad}/10
+                </span>
+              </div>
+              <h3 className="mt-3 text-lg font-bold text-[#f3f7fa]">
+                {training.title}
+              </h3>
+              {training.notes && (
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#c5d0d7]">
+                  {training.notes}
+                </p>
+              )}
+              <div className="mt-5 flex flex-wrap gap-2 border-t border-[#29313a] pt-4">
+                {reactions.map(({ value, label }) => {
+                  const reacted = training.reactions[value].includes(actor.id);
+                  return (
+                    <button
+                      aria-label={`${label}: ${training.reactions[value].length}`}
+                      aria-pressed={reacted}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${reacted ? "border-[#2eb8ff] bg-[#173447] text-[#e5f8ff]" : "border-[#303b45] bg-[#151a20] text-[#aebbc4] hover:border-[#4d86a5] hover:text-white"}`}
+                      key={value}
+                      onClick={() => onReact(training, value)}
+                    >
+                      {value} {training.reactions[value].length || ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </article>
+          );
+        })}
+        {!sortedTrainings.length && (
+          <section className="panel p-8 text-center text-sm text-[#91a1ad]">
+            Ainda não há treinos pessoais publicados.
+          </section>
+        )}
+      </section>
+
+      {editing !== undefined && (
+        <PersonalTrainingEditor
+          training={editing}
+          onClose={() => setEditing(undefined)}
+          onSave={(input) => {
+            const saved = editing ? onUpdate(editing, input) : onCreate(input);
+            if (saved) setEditing(undefined);
+            return saved;
+          }}
+        />
+      )}
+    </section>
+  );
+}
