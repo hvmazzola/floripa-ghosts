@@ -427,9 +427,10 @@ export function PersonalTrainingsView({
             (total, [, memberIds]) => total + memberIds.length,
             0,
           );
-          const actorHasReacted = reactionSummary.some(([, memberIds]) =>
+          const actorReaction = reactionSummary.find(([, memberIds]) =>
             memberIds.includes(actor.id),
-          );
+          )?.[0];
+          const actorHasReacted = Boolean(actorReaction);
           const comments = training.comments ?? [];
           return (
             <article className="panel p-5" key={training.id}>
@@ -528,14 +529,24 @@ export function PersonalTrainingsView({
                   >
                     <PopoverTrigger asChild>
                       <button
-                        aria-label="Reagir ao treino"
+                        aria-label={
+                          actorReaction
+                            ? `Sua reação: ${actorReaction}`
+                            : "Reagir ao treino"
+                        }
                         aria-pressed={actorHasReacted}
                         className={`grid size-8 place-items-center rounded-md transition-colors ${actorHasReacted ? "bg-[#173447] text-[#8fe0ff]" : "text-[#b9c7cf] hover:bg-[#1c2932] hover:text-white"}`}
                         onMouseEnter={() => openReactionMenu(training.id)}
                         onMouseLeave={closeReactionMenu}
                         type="button"
                       >
-                        <SmilePlus size={16} />
+                        {actorReaction ? (
+                          <span className="text-base leading-none">
+                            {actorReaction}
+                          </span>
+                        ) : (
+                          <SmilePlus size={16} />
+                        )}
                       </button>
                     </PopoverTrigger>
                     <PopoverContent
@@ -562,7 +573,8 @@ export function PersonalTrainingsView({
                           {quickReactions.map(({ value, label }) => (
                             <button
                               aria-label={label}
-                              className="grid size-9 place-items-center rounded-md text-lg transition-colors hover:bg-[#24313a]"
+                              aria-pressed={actorReaction === value}
+                              className={`grid size-9 place-items-center rounded-md text-lg transition-colors ${actorReaction === value ? "bg-[#173447] ring-1 ring-[#58cfff]" : "hover:bg-[#24313a]"}`}
                               key={value}
                               onClick={() => {
                                 onReact(training, value);
