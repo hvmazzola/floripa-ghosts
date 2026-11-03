@@ -380,6 +380,18 @@ export function PersonalTrainingsView({
   } | null>(null);
   const [editingCommentMessage, setEditingCommentMessage] = useState("");
   const commentInputs = useRef<Record<string, HTMLInputElement | null>>({});
+  const reactionCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openReactionMenu = (trainingId: string) => {
+    if (reactionCloseTimer.current) clearTimeout(reactionCloseTimer.current);
+    setPickerTrainingId(trainingId);
+  };
+  const closeReactionMenu = () => {
+    if (reactionCloseTimer.current) clearTimeout(reactionCloseTimer.current);
+    reactionCloseTimer.current = setTimeout(() => {
+      setPickerTrainingId(null);
+      setFullPickerTrainingId(null);
+    }, 120);
+  };
   const canRegister = actor.status === "active" && actor.roles.includes("athlete");
   const sortedTrainings = [...trainings].sort(
     (first, second) => Date.parse(second.occurredAt) - Date.parse(first.occurredAt),
@@ -502,79 +514,102 @@ export function PersonalTrainingsView({
                   ))}
                 </div>
               )}
-              <div className="mt-5 flex items-center gap-3 border-t border-[#29313a] pt-4">
-                <Popover
-                  open={pickerTrainingId === training.id}
-                  onOpenChange={(open) => {
-                    setPickerTrainingId(open ? training.id : null);
-                    if (!open) setFullPickerTrainingId(null);
-                  }}
-                >
-                  <PopoverTrigger asChild>
-                    <button
-                      aria-label="Reagir ao treino"
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#303b45] bg-[#151a20] px-2.5 text-xs font-medium text-[#b9c7cf] transition-colors hover:border-[#4d86a5] hover:text-white"
-                      type="button"
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#29313a] pt-4">
+                <div className="flex items-center gap-3">
+                  <Popover
+                    open={pickerTrainingId === training.id}
+                    onOpenChange={(open) => {
+                      if (open) openReactionMenu(training.id);
+                      else closeReactionMenu();
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <button
+                        aria-label="Reagir ao treino"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md text-xs font-medium text-[#b9c7cf] transition-colors hover:text-white"
+                        onMouseEnter={() => openReactionMenu(training.id)}
+                        onMouseLeave={closeReactionMenu}
+                        type="button"
+                      >
+                        <SmilePlus size={16} className="text-[#83dfff]" />
+                        <span>Reagir</span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      className="overflow-hidden !p-0"
+                      onMouseEnter={() => openReactionMenu(training.id)}
+                      onMouseLeave={closeReactionMenu}
                     >
-                      <SmilePlus size={15} className="text-[#83dfff]" />
-                      <span>Reações</span>
-                      {reactionSummary.map(([emoji]) => (
-                        <span key={emoji}>{emoji}</span>
-                      ))}
-                      {totalReactions > 0 && <span>{totalReactions}</span>}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="overflow-hidden !p-0">
-                    {fullPickerTrainingId === training.id ? (
-                      <EmojiPicker
-                        height={390}
-                        previewConfig={{ showPreview: false }}
-                        searchPlaceholder="Buscar emoji"
-                        theme="dark"
-                        width={320}
-                        onEmojiClick={(emoji) => {
-                          onReact(training, emoji.emoji);
-                          setPickerTrainingId(null);
-                          setFullPickerTrainingId(null);
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-center gap-1 p-2">
-                        {quickReactions.map(({ value, label }) => (
+                      {fullPickerTrainingId === training.id ? (
+                        <EmojiPicker
+                          height={390}
+                          previewConfig={{ showPreview: false }}
+                          searchPlaceholder="Buscar emoji"
+                          theme="dark"
+                          width={320}
+                          onEmojiClick={(emoji) => {
+                            onReact(training, emoji.emoji);
+                            setPickerTrainingId(null);
+                            setFullPickerTrainingId(null);
+                          }}
+                        />
+                      ) : (
+                        <div className="flex items-center gap-1 p-2">
+                          {quickReactions.map(({ value, label }) => (
+                            <button
+                              aria-label={label}
+                              className="grid size-9 place-items-center rounded-md text-lg transition-colors hover:bg-[#24313a]"
+                              key={value}
+                              onClick={() => {
+                                onReact(training, value);
+                                setPickerTrainingId(null);
+                              }}
+                              type="button"
+                            >
+                              {value}
+                            </button>
+                          ))}
                           <button
-                            aria-label={label}
-                            className="grid size-9 place-items-center rounded-md text-lg transition-colors hover:bg-[#24313a]"
-                            key={value}
-                            onClick={() => {
-                              onReact(training, value);
-                              setPickerTrainingId(null);
-                            }}
+                            aria-label="Escolher outro emoji"
+                            className="grid size-9 place-items-center rounded-md text-[#aebbc4] transition-colors hover:bg-[#24313a] hover:text-white"
+                            onClick={() => setFullPickerTrainingId(training.id)}
                             type="button"
                           >
-                            {value}
+                            <Plus size={17} />
                           </button>
-                        ))}
-                        <button
-                          aria-label="Escolher outro emoji"
-                          className="grid size-9 place-items-center rounded-md text-[#aebbc4] transition-colors hover:bg-[#24313a] hover:text-white"
-                          onClick={() => setFullPickerTrainingId(training.id)}
-                          type="button"
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                  <button
+                    aria-label="Comentar"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md text-xs font-medium text-[#b9c7cf] transition-colors hover:text-white"
+                    onClick={() => commentInputs.current[training.id]?.focus()}
+                    type="button"
+                  >
+                    <MessageCircle size={16} className="text-[#83dfff]" />
+                    {comments.length > 0 && <span>{comments.length}</span>}
+                  </button>
+                </div>
+                {reactionSummary.length > 0 && (
+                  <div
+                    aria-label={`${totalReactions} reações`}
+                    className="flex items-center text-xs text-[#b9c7cf]"
+                  >
+                    <div className="flex -space-x-1.5">
+                      {reactionSummary.map(([emoji]) => (
+                        <span
+                          className="grid size-5 place-items-center rounded-full border border-[#111419] bg-[#24313a] text-[11px]"
+                          key={emoji}
                         >
-                          <Plus size={17} />
-                        </button>
-                      </div>
-                    )}
-                  </PopoverContent>
-                </Popover>
-                <button
-                  aria-label="Comentar"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#303b45] bg-[#151a20] px-2.5 text-xs font-medium text-[#b9c7cf] transition-colors hover:border-[#4d86a5] hover:text-white"
-                  onClick={() => commentInputs.current[training.id]?.focus()}
-                  type="button"
-                >
-                  <MessageCircle size={15} className="text-[#83dfff]" />
-                  {comments.length > 0 && <span>{comments.length}</span>}
-                </button>
+                          {emoji}
+                        </span>
+                      ))}
+                    </div>
+                    <span className="ml-2">{totalReactions}</span>
+                  </div>
+                )}
               </div>
               <section className="mt-5 border-t border-[#29313a] pt-4">
                 {comments.length > 0 && (
