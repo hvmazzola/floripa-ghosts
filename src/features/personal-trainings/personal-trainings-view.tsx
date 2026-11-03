@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import dynamic from "next/dynamic";
@@ -379,6 +379,7 @@ export function PersonalTrainingsView({
     comment: PersonalTrainingComment;
   } | null>(null);
   const [editingCommentMessage, setEditingCommentMessage] = useState("");
+  const commentInputs = useRef<Record<string, HTMLInputElement | null>>({});
   const canRegister = actor.status === "active" && actor.roles.includes("athlete");
   const sortedTrainings = [...trainings].sort(
     (first, second) => Date.parse(second.occurredAt) - Date.parse(first.occurredAt),
@@ -501,19 +502,7 @@ export function PersonalTrainingsView({
                   ))}
                 </div>
               )}
-              {reactionSummary.length > 0 && (
-                <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#b9c7cf]">
-                  {reactionSummary.map(([emoji, memberIds]) => (
-                    <span key={emoji}>
-                      {emoji} {memberIds.length}
-                    </span>
-                  ))}
-                  <span className="text-[#82929d]">
-                    {totalReactions} {totalReactions === 1 ? "reação" : "reações"}
-                  </span>
-                </div>
-              )}
-              <div className="mt-5 flex flex-wrap gap-2 border-t border-[#29313a] pt-4">
+              <div className="mt-5 flex items-center gap-3 border-t border-[#29313a] pt-4">
                 <Popover
                   open={pickerTrainingId === training.id}
                   onOpenChange={(open) => {
@@ -524,10 +513,15 @@ export function PersonalTrainingsView({
                   <PopoverTrigger asChild>
                     <button
                       aria-label="Reagir ao treino"
-                      className="grid size-8 place-items-center rounded-full border border-[#303b45] bg-[#151a20] text-[#aebbc4] transition-colors hover:border-[#4d86a5] hover:text-white"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#303b45] bg-[#151a20] px-2.5 text-xs font-medium text-[#b9c7cf] transition-colors hover:border-[#4d86a5] hover:text-white"
                       type="button"
                     >
-                      <SmilePlus size={15} />
+                      <SmilePlus size={15} className="text-[#83dfff]" />
+                      <span>Reações</span>
+                      {reactionSummary.map(([emoji]) => (
+                        <span key={emoji}>{emoji}</span>
+                      ))}
+                      {totalReactions > 0 && <span>{totalReactions}</span>}
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="overflow-hidden !p-0">
@@ -572,14 +566,19 @@ export function PersonalTrainingsView({
                     )}
                   </PopoverContent>
                 </Popover>
+                <button
+                  aria-label="Comentar"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#303b45] bg-[#151a20] px-2.5 text-xs font-medium text-[#b9c7cf] transition-colors hover:border-[#4d86a5] hover:text-white"
+                  onClick={() => commentInputs.current[training.id]?.focus()}
+                  type="button"
+                >
+                  <MessageCircle size={15} className="text-[#83dfff]" />
+                  {comments.length > 0 && <span>{comments.length}</span>}
+                </button>
               </div>
               <section className="mt-5 border-t border-[#29313a] pt-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[#dce9ef]">
-                  <MessageCircle size={15} className="text-[#83dfff]" />
-                  Comentários {comments.length > 0 && `(${comments.length})`}
-                </div>
                 {comments.length > 0 && (
-                  <div className="mt-4 grid gap-3">
+                  <div className="grid gap-3">
                     {comments.map((comment) => {
                       const commentAuthor = roster.find(
                         (member) => member.id === comment.authorId,
@@ -680,6 +679,9 @@ export function PersonalTrainingsView({
                     <input
                       className="min-w-0 flex-1 rounded-md border border-[#3b4b56] bg-[#0b0d10] px-3 py-2 text-sm text-white outline-none placeholder:text-[#74828c] focus:border-[#58cfff]"
                       placeholder="Escreva um comentário"
+                      ref={(element) => {
+                        commentInputs.current[training.id] = element;
+                      }}
                       value={commentDrafts[training.id] ?? ""}
                       onChange={(event) =>
                         setCommentDrafts((current) => ({
