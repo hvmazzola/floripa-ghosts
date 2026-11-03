@@ -8,6 +8,7 @@ import {
   PostContextMenu,
   type PostContextMenuState,
 } from "@/components/post-context-menu";
+import { RecordActionsMenu } from "@/components/record-actions-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { VideoEmbed } from "@/components/video-embed";
 import type { TeamPost, TeamPostInput } from "@/domain/communication";
@@ -281,29 +282,25 @@ export function CommunicationView({
                     <h3 className="text-base font-bold">{post.title}</h3>
                   </div>
                 </div>
-                {isAdmin && (
-                  <button
-                    className="mr-8 inline-flex items-center justify-center rounded-md border border-[#B91C1C] bg-[#B91C1C] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#991B1B]"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onDelete(post.id);
-                    }}
-                  >
-                    Excluir
-                  </button>
-                )}
+                <RecordActionsMenu
+                  label={`Opções de ${post.title}`}
+                  actions={[
+                    {
+                      id: "hide",
+                      label: "Excluir da minha lista",
+                      allowed: true,
+                      onSelect: () => onHide(post),
+                    },
+                    {
+                      id: "delete",
+                      label: "Excluir para todos",
+                      allowed: isAdmin,
+                      destructive: true,
+                      onSelect: () => onDelete(post.id),
+                    },
+                  ]}
+                />
               </div>
-              <button
-                className="absolute right-3 top-3 grid size-7 place-items-center rounded-full text-lg leading-none text-[#92a2ad] transition-colors hover:bg-[#28323a] hover:text-white"
-                aria-label={`Excluir ${post.title} da minha lista`}
-                title="Excluir da minha lista"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onHide(post);
-                }}
-              >
-                ×
-              </button>
               <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#c5d0d7]">
                 {post.message}
               </p>

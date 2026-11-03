@@ -46,6 +46,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { Confirmation } from "@/components/confirm-dialog";
+import { RecordActionsMenu } from "@/components/record-actions-menu";
 import {
   PostContextMenu,
   type PostContextMenuState,
@@ -911,17 +912,26 @@ export default function Home() {
                         <span className="mt-1 block truncate text-xs text-[#9daab4]">
                           {post.message}
                         </span>
-                        <button
-                          className="absolute right-3 top-3 grid size-7 place-items-center rounded-full text-lg leading-none text-[#92a2ad] transition-colors hover:bg-[#28323a] hover:text-white"
-                          aria-label={`Excluir ${post.title} da minha lista`}
-                          title="Excluir da minha lista"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            requestHidePost(post);
-                          }}
-                        >
-                          ×
-                        </button>
+                        <div className="absolute right-3 top-3">
+                          <RecordActionsMenu
+                            label={`Opções de ${post.title}`}
+                            actions={[
+                              {
+                                id: "hide",
+                                label: "Excluir da minha lista",
+                                allowed: true,
+                                onSelect: () => requestHidePost(post),
+                              },
+                              {
+                                id: "delete",
+                                label: "Excluir para todos",
+                                allowed: actor.isAdmin,
+                                destructive: true,
+                                onSelect: () => deletePost(post.id),
+                              },
+                            ]}
+                          />
+                        </div>
                       </article>
                     ))}
                     {!notificationPosts.length && (
@@ -1081,26 +1091,28 @@ export default function Home() {
                       </div>
                       {role === "coach" && (
                         <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            className="secondary !px-3 !py-2 !text-xs"
-                            onClick={() => {
-                              setExerciseSubmitted(false);
-                              setExerciseVideoError(false);
-                              setExerciseDraft({ ...exercise });
-                            }}
-                          >
-                            Editar
-                          </button>
-                          {actor.isAdmin && (
-                            <button
-                              type="button"
-                              className="inline-flex items-center justify-center rounded-md border border-[#B91C1C] bg-[#B91C1C] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#991B1B]"
-                              onClick={() => deleteExercise(exercise)}
-                            >
-                              Excluir
-                            </button>
-                          )}
+                          <RecordActionsMenu
+                            label={`Opções de ${exercise.drill}`}
+                            actions={[
+                              {
+                                id: "edit",
+                                label: "Editar",
+                                allowed: true,
+                                onSelect: () => {
+                                  setExerciseSubmitted(false);
+                                  setExerciseVideoError(false);
+                                  setExerciseDraft({ ...exercise });
+                                },
+                              },
+                              {
+                                id: "delete",
+                                label: "Excluir",
+                                allowed: actor.isAdmin,
+                                destructive: true,
+                                onSelect: () => deleteExercise(exercise),
+                              },
+                            ]}
+                          />
                         </div>
                       )}
                       {exercise.videoUrl && (
@@ -1125,9 +1137,17 @@ export default function Home() {
                   <p className="eyebrow">PERFIL DO INTEGRANTE</p>
                   <h2>{actor.name}</h2>
                 </div>
-                <button className="secondary" onClick={() => setProfileEditing(actor)}>
-                  Editar perfil
-                </button>
+                <RecordActionsMenu
+                  label="Opções do perfil"
+                  actions={[
+                    {
+                      id: "edit",
+                      label: "Editar",
+                      allowed: true,
+                      onSelect: () => setProfileEditing(actor),
+                    },
+                  ]}
+                />
               </div>
               <div className="profile-summary">
                 <Avatar member={actor} className="profile-avatar" />
@@ -1200,20 +1220,24 @@ export default function Home() {
                     <div className="member-card-top">
                       <Avatar member={member} className="large" />
                       {actor.isAdmin && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            className="secondary !px-3 !py-2 !text-xs"
-                            onClick={() => setProfileEditing(member)}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            className="inline-flex items-center justify-center rounded-md border border-[#B91C1C] bg-[#B91C1C] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#991B1B]"
-                            onClick={() => deleteMember(member)}
-                          >
-                            Excluir
-                          </button>
-                        </div>
+                        <RecordActionsMenu
+                          label={`Opções de ${member.name}`}
+                          actions={[
+                            {
+                              id: "edit",
+                              label: "Editar",
+                              allowed: true,
+                              onSelect: () => setProfileEditing(member),
+                            },
+                            {
+                              id: "delete",
+                              label: "Excluir",
+                              allowed: true,
+                              destructive: true,
+                              onSelect: () => deleteMember(member),
+                            },
+                          ]}
+                        />
                       )}
                     </div>
                     <h3>{member.name}</h3>
@@ -1376,20 +1400,24 @@ export default function Home() {
                               Publicar plano
                             </button>
                           )}
-                          <button
-                            className="secondary !px-3 !py-2 !text-xs"
-                            onClick={() => setEditing(current)}
-                          >
-                            Editar
-                          </button>
-                          {actor.isAdmin && (
-                            <button
-                              className="inline-flex items-center justify-center rounded-md border border-[#B91C1C] bg-[#B91C1C] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#991B1B]"
-                              onClick={() => deleteTraining(current)}
-                            >
-                              Excluir
-                            </button>
-                          )}
+                          <RecordActionsMenu
+                            label={`Opções de ${current.title}`}
+                            actions={[
+                              {
+                                id: "edit",
+                                label: "Editar",
+                                allowed: true,
+                                onSelect: () => setEditing(current),
+                              },
+                              {
+                                id: "delete",
+                                label: "Excluir",
+                                allowed: actor.isAdmin,
+                                destructive: true,
+                                onSelect: () => deleteTraining(current),
+                              },
+                            ]}
+                          />
                         </div>
                       )}
                     </div>

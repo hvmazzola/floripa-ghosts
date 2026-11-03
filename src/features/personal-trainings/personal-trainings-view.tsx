@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Dumbbell } from "lucide-react";
 
+import { RecordActionsMenu } from "@/components/record-actions-menu";
 import {
   maxPersonalTrainingMediaCount,
   maxPersonalTrainingMediaSizeBytes,
@@ -400,20 +401,24 @@ export function PersonalTrainingsView({
                   </div>
                 </div>
                 {isOwner && (
-                  <div className="flex gap-2">
-                    <button
-                      className="secondary !px-3 !py-2 !text-xs"
-                      onClick={() => setEditing(training)}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      className="inline-flex items-center justify-center rounded-md border border-[#B91C1C] bg-[#B91C1C] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#991B1B]"
-                      onClick={() => onDelete(training)}
-                    >
-                      Excluir
-                    </button>
-                  </div>
+                  <RecordActionsMenu
+                    label={`Opções de ${training.title}`}
+                    actions={[
+                      {
+                        id: "edit",
+                        label: "Editar",
+                        allowed: true,
+                        onSelect: () => setEditing(training),
+                      },
+                      {
+                        id: "delete",
+                        label: "Excluir",
+                        allowed: true,
+                        destructive: true,
+                        onSelect: () => onDelete(training),
+                      },
+                    ]}
+                  />
                 )}
               </div>
               <div className="mt-5 flex flex-wrap items-center gap-2">
