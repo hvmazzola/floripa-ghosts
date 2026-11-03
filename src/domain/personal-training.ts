@@ -10,6 +10,24 @@ export const personalTrainingCategories = [
 
 export type PersonalTrainingCategory = (typeof personalTrainingCategories)[number];
 export type PersonalTrainingReaction = "💪" | "🔥" | "👏";
+export const personalTrainingMediaTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "video/mp4",
+  "video/webm",
+] as const;
+export const maxPersonalTrainingMediaCount = 5;
+export const maxPersonalTrainingMediaSizeBytes = 10 * 1024 * 1024;
+
+export type PersonalTrainingMediaType = (typeof personalTrainingMediaTypes)[number];
+export type PersonalTrainingMedia = {
+  id: string;
+  name: string;
+  mimeType: PersonalTrainingMediaType;
+  dataUrl: string;
+  sizeBytes: number;
+};
 export type PersonalTraining = {
   id: string;
   authorId: string;
@@ -19,6 +37,7 @@ export type PersonalTraining = {
   durationMinutes: number;
   perceivedLoad: number;
   notes: string;
+  media: PersonalTrainingMedia[];
   reactions: Record<PersonalTrainingReaction, string[]>;
 };
 export type PersonalTrainingInput = Omit<
@@ -36,6 +55,32 @@ export const personalTrainingCategoryLabel: Record<PersonalTrainingCategory, str
 
 function emptyReactions(): PersonalTraining["reactions"] {
   return { "💪": [], "🔥": [], "👏": [] };
+}
+
+export function validatePersonalTrainingMedia(
+  media: PersonalTrainingMedia[],
+): PersonalTrainingMedia[] {
+  if (media.length > maxPersonalTrainingMediaCount) {
+    throw new Error("Adicione no máximo cinco mídias por treino.");
+  }
+  return media.map((item) => {
+    if (!personalTrainingMediaTypes.includes(item.mimeType)) {
+      throw new Error("Envie imagens JPG, PNG, WebP ou vídeos MP4, WebM.");
+    }
+    if (!Number.isInteger(item.sizeBytes) || item.sizeBytes < 1) {
+      throw new Error("Não foi possível validar o tamanho da mídia.");
+    }
+    if (item.sizeBytes > maxPersonalTrainingMediaSizeBytes) {
+      throw new Error("Cada mídia pode ter no máximo 10 MB.");
+    }
+    if (
+      !item.name.trim() ||
+      !item.dataUrl.startsWith(`data:${item.mimeType};base64,`)
+    ) {
+      throw new Error("Não foi possível processar a mídia enviada.");
+    }
+    return { ...item, name: item.name.trim() };
+  });
 }
 
 function normalizeInput(input: PersonalTrainingInput) {
@@ -60,6 +105,7 @@ function normalizeInput(input: PersonalTrainingInput) {
     ...input,
     title: input.title.trim(),
     notes: input.notes.trim(),
+    media: validatePersonalTrainingMedia(input.media),
   };
 }
 
@@ -125,6 +171,7 @@ export function seedPersonalTrainings(): PersonalTraining[] {
       durationMinutes: 35,
       perceivedLoad: 4,
       notes: "Ritmo confortável para soltar as pernas.",
+      media: [],
       reactions: { "💪": ["athlete-1"], "🔥": [], "👏": ["coach-demo"] },
     },
     {
@@ -136,6 +183,7 @@ export function seedPersonalTrainings(): PersonalTraining[] {
       durationMinutes: 60,
       perceivedLoad: 7,
       notes: "Agachamento, posterior e core.",
+      media: [],
       reactions: { "💪": ["mazzola"], "🔥": ["coach-demo"], "👏": [] },
     },
   ];
@@ -155,6 +203,22 @@ export function isPersonalTrainingList(value: unknown): value is PersonalTrainin
         typeof training.durationMinutes === "number" &&
         typeof training.perceivedLoad === "number" &&
         typeof training.notes === "string" &&
+        (training.media === undefined ||
+          (Array.isArray(training.media) &&
+            training.media.every((item: unknown) => {
+              if (!item || typeof item !== "object") return false;
+              const media = item as Record<string, unknown>;
+              return (
+                typeof media.id === "string" &&
+                typeof media.name === "string" &&
+                typeof media.mimeType === "string" &&
+                personalTrainingMediaTypes.includes(
+                  media.mimeType as PersonalTrainingMediaType,
+                ) &&
+                typeof media.dataUrl === "string" &&
+                typeof media.sizeBytes === "number"
+              );
+            }))) &&
         training.reactions &&
         ["💪", "🔥", "👏"].every(
           (reaction) =>

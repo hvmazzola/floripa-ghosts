@@ -6,10 +6,15 @@ import { ptBR } from "date-fns/locale";
 import { Dumbbell } from "lucide-react";
 
 import {
+  maxPersonalTrainingMediaCount,
+  maxPersonalTrainingMediaSizeBytes,
   personalTrainingCategories,
   personalTrainingCategoryLabel,
+  personalTrainingMediaTypes,
   type PersonalTraining,
   type PersonalTrainingInput,
+  type PersonalTrainingMedia,
+  type PersonalTrainingMediaType,
   type PersonalTrainingReaction,
 } from "@/domain/personal-training";
 import type { Member } from "@/domain/training";
@@ -28,6 +33,7 @@ function blankInput(): PersonalTrainingInput {
     durationMinutes: 45,
     perceivedLoad: 5,
     notes: "",
+    media: [],
   };
 }
 
@@ -35,6 +41,22 @@ function toLocalInput(value: string) {
   const date = new Date(value);
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+}
+
+function fileToPersonalTrainingMedia(file: File): Promise<PersonalTrainingMedia> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Não foi possível ler a mídia."));
+    reader.onload = () =>
+      resolve({
+        id: crypto.randomUUID(),
+        name: file.name,
+        mimeType: file.type as PersonalTrainingMediaType,
+        dataUrl: String(reader.result),
+        sizeBytes: file.size,
+      });
+    reader.readAsDataURL(file);
+  });
 }
 
 function PersonalTrainingEditor({
@@ -55,10 +77,12 @@ function PersonalTrainingEditor({
           durationMinutes: training.durationMinutes,
           perceivedLoad: training.perceivedLoad,
           notes: training.notes,
+          media: training.media ?? [],
         }
       : blankInput(),
   );
   const [submitted, setSubmitted] = useState(false);
+  const [mediaError, setMediaError] = useState("");
   const invalid = {
     title: !input.title.trim(),
     date: !Number.isFinite(Date.parse(input.occurredAt)),
@@ -71,6 +95,33 @@ function PersonalTrainingEditor({
   };
   const hasInvalid = Object.values(invalid).some(Boolean);
   const invalidClass = "!border-red-500 !ring-1 !ring-red-500/60";
+
+  const addMedia = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const selectedFiles = Array.from(files);
+    if (input.media.length + selectedFiles.length > maxPersonalTrainingMediaCount) {
+      setMediaError("Adicione no máximo cinco mídias por treino.");
+      return;
+    }
+    const invalidFile = selectedFiles.find(
+      (file) =>
+        !personalTrainingMediaTypes.includes(file.type as PersonalTrainingMediaType) ||
+        file.size > maxPersonalTrainingMediaSizeBytes,
+    );
+    if (invalidFile) {
+      setMediaError(`“${invalidFile.name}” não é compatível ou ultrapassa 10 MB.`);
+      return;
+    }
+    try {
+      const media = await Promise.all(selectedFiles.map(fileToPersonalTrainingMedia));
+      setInput((current) => ({ ...current, media: [...current.media, ...media] }));
+      setMediaError("");
+    } catch (error) {
+      setMediaError(
+        error instanceof Error ? error.message : "Não foi possível ler a mídia.",
+      );
+    }
+  };
 
   return (
     <div
@@ -204,6 +255,64 @@ function PersonalTrainingEditor({
               placeholder="Como foi o treino?"
             />
           </label>
+          <div>
+            <span className="field-label">Mídias do treino</span>
+            <p className="mt-1 text-xs text-[#91a1ad]">
+              Até 5 imagens ou vídeos curtos (JPG, PNG, WebP, MP4 ou WebM, máx. 10 MB
+              cada).
+            </p>
+            {mediaError && <p className="error mt-1">{mediaError}</p>}
+            <input
+              className="mt-3 file:mr-3 file:rounded-md file:border-0 file:bg-[#173447] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#d8f5ff] hover:file:bg-[#204a62]"
+              accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+              multiple
+              type="file"
+              onChange={(event) => {
+                void addMedia(event.target.files);
+                event.target.value = "";
+              }}
+            />
+            {input.media.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {input.media.map((media) => (
+                  <article
+                    className="relative overflow-hidden rounded-lg border border-[#303b45] bg-[#0b0d10]"
+                    key={media.id}
+                  >
+                    {media.mimeType.startsWith("image/") ? (
+                      <img
+                        alt={media.name}
+                        className="aspect-video w-full object-cover"
+                        src={media.dataUrl}
+                      />
+                    ) : (
+                      <video
+                        className="aspect-video w-full object-cover"
+                        controls
+                        src={media.dataUrl}
+                      />
+                    )}
+                    <p className="truncate px-2 py-1.5 text-[11px] text-[#c5d0d7]">
+                      {media.name}
+                    </p>
+                    <button
+                      aria-label={`Remover ${media.name}`}
+                      className="absolute right-1 top-1 grid size-7 place-items-center rounded-full bg-black/70 text-lg text-white hover:bg-[#B91C1C]"
+                      onClick={() =>
+                        setInput((current) => ({
+                          ...current,
+                          media: current.media.filter((item) => item.id !== media.id),
+                        }))
+                      }
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex justify-end gap-3 border-t border-[#283039] pt-5">
             <button className="secondary !px-3 !py-2 !text-xs" onClick={onClose}>
               Cancelar
@@ -325,6 +434,34 @@ export function PersonalTrainingsView({
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#c5d0d7]">
                   {training.notes}
                 </p>
+              )}
+              {(training.media ?? []).length > 0 && (
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {training.media.map((media) => (
+                    <figure
+                      className="overflow-hidden rounded-lg border border-[#303b45] bg-black"
+                      key={media.id}
+                    >
+                      {media.mimeType.startsWith("image/") ? (
+                        <img
+                          alt={media.name}
+                          className="aspect-video w-full object-cover"
+                          src={media.dataUrl}
+                        />
+                      ) : (
+                        <video
+                          className="aspect-video w-full"
+                          controls
+                          preload="metadata"
+                          src={media.dataUrl}
+                        />
+                      )}
+                      <figcaption className="truncate px-3 py-2 text-xs text-[#aebbc4]">
+                        {media.name}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
               )}
               <div className="mt-5 flex flex-wrap gap-2 border-t border-[#29313a] pt-4">
                 {reactions.map(({ value, label }) => {
