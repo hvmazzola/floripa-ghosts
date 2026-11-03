@@ -427,6 +427,9 @@ export function PersonalTrainingsView({
             (total, [, memberIds]) => total + memberIds.length,
             0,
           );
+          const actorHasReacted = reactionSummary.some(([, memberIds]) =>
+            memberIds.includes(actor.id),
+          );
           const comments = training.comments ?? [];
           return (
             <article className="panel p-5" key={training.id}>
@@ -526,13 +529,13 @@ export function PersonalTrainingsView({
                     <PopoverTrigger asChild>
                       <button
                         aria-label="Reagir ao treino"
-                        className="inline-flex h-8 items-center gap-1.5 rounded-md text-xs font-medium text-[#b9c7cf] transition-colors hover:text-white"
+                        aria-pressed={actorHasReacted}
+                        className={`grid size-8 place-items-center rounded-md transition-colors ${actorHasReacted ? "bg-[#173447] text-[#8fe0ff]" : "text-[#b9c7cf] hover:bg-[#1c2932] hover:text-white"}`}
                         onMouseEnter={() => openReactionMenu(training.id)}
                         onMouseLeave={closeReactionMenu}
                         type="button"
                       >
-                        <SmilePlus size={16} className="text-[#83dfff]" />
-                        <span>Reagir</span>
+                        <SmilePlus size={16} />
                       </button>
                     </PopoverTrigger>
                     <PopoverContent
