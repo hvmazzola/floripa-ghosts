@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Dumbbell } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Dumbbell, Plus } from "lucide-react";
 
 import { RecordActionsMenu } from "@/components/record-actions-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   maxPersonalTrainingMediaCount,
   maxPersonalTrainingMediaSizeBytes,
@@ -20,11 +22,15 @@ import {
 } from "@/domain/personal-training";
 import type { Member } from "@/domain/training";
 
-const reactions: Array<{ value: PersonalTrainingReaction; label: string }> = [
+const quickReactions: Array<{ value: PersonalTrainingReaction; label: string }> = [
   { value: "💪", label: "Força" },
   { value: "🔥", label: "Fogo" },
   { value: "👏", label: "Aplausos" },
+  { value: "❤️", label: "Coração" },
+  { value: "⚡", label: "Energia" },
 ];
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 function blankInput(): PersonalTrainingInput {
   return {
@@ -354,6 +360,7 @@ export function PersonalTrainingsView({
   const [editing, setEditing] = useState<PersonalTraining | null | undefined>(
     undefined,
   );
+  const [pickerTrainingId, setPickerTrainingId] = useState<string | null>(null);
   const canRegister = actor.status === "active" && actor.roles.includes("athlete");
   const sortedTrainings = [...trainings].sort(
     (first, second) => Date.parse(second.occurredAt) - Date.parse(first.occurredAt),
@@ -382,6 +389,16 @@ export function PersonalTrainingsView({
         {sortedTrainings.map((training) => {
           const author = roster.find((member) => member.id === training.authorId);
           const isOwner = training.authorId === actor.id;
+          const reactionOptions = [
+            ...quickReactions,
+            ...Object.keys(training.reactions)
+              .filter(
+                (emoji) =>
+                  !quickReactions.some((reaction) => reaction.value === emoji) &&
+                  training.reactions[emoji].length > 0,
+              )
+              .map((emoji) => ({ value: emoji, label: emoji })),
+          ];
           return (
             <article className="panel p-5" key={training.id}>
               <div className="flex items-start justify-between gap-4">
@@ -469,20 +486,50 @@ export function PersonalTrainingsView({
                 </div>
               )}
               <div className="mt-5 flex flex-wrap gap-2 border-t border-[#29313a] pt-4">
-                {reactions.map(({ value, label }) => {
-                  const reacted = training.reactions[value].includes(actor.id);
+                {reactionOptions.map(({ value, label }) => {
+                  const memberIds = training.reactions[value] ?? [];
+                  const reacted = memberIds.includes(actor.id);
                   return (
                     <button
-                      aria-label={`${label}: ${training.reactions[value].length}`}
+                      aria-label={`${label}: ${memberIds.length}`}
                       aria-pressed={reacted}
                       className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${reacted ? "border-[#2eb8ff] bg-[#173447] text-[#e5f8ff]" : "border-[#303b45] bg-[#151a20] text-[#aebbc4] hover:border-[#4d86a5] hover:text-white"}`}
                       key={value}
                       onClick={() => onReact(training, value)}
                     >
-                      {value} {training.reactions[value].length || ""}
+                      {value} {memberIds.length || ""}
                     </button>
                   );
                 })}
+                <Popover
+                  open={pickerTrainingId === training.id}
+                  onOpenChange={(open) =>
+                    setPickerTrainingId(open ? training.id : null)
+                  }
+                >
+                  <PopoverTrigger asChild>
+                    <button
+                      aria-label="Escolher outra reação"
+                      className="grid size-8 place-items-center rounded-full border border-[#303b45] bg-[#151a20] text-[#aebbc4] transition-colors hover:border-[#4d86a5] hover:text-white"
+                      type="button"
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="overflow-hidden !p-0">
+                    <EmojiPicker
+                      height={390}
+                      previewConfig={{ showPreview: false }}
+                      searchPlaceholder="Buscar emoji"
+                      theme="dark"
+                      width={320}
+                      onEmojiClick={(emoji) => {
+                        onReact(training, emoji.emoji);
+                        setPickerTrainingId(null);
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </article>
           );

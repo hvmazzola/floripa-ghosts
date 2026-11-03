@@ -25,14 +25,19 @@ test("somente integrantes com atribuição de atleta registram treino pessoal", 
   assert.throws(() => createPersonalTraining(input, roster[1], roster));
 });
 
-test("reações são individuais e podem ser desfeitas", () => {
+test("cada pessoa mantém uma reação por treino, pode trocar e desfazer", () => {
   const roster = seedMembers();
   const training = createPersonalTraining(input, roster[0], roster);
   const reacted = togglePersonalTrainingReaction(training, "athlete-1", "🔥");
   assert.deepEqual(reacted.reactions["🔥"], ["athlete-1"]);
 
-  const undone = togglePersonalTrainingReaction(reacted, "athlete-1", "🔥");
+  const changed = togglePersonalTrainingReaction(reacted, "athlete-1", "👏");
+  assert.deepEqual(changed.reactions["🔥"], []);
+  assert.deepEqual(changed.reactions["👏"], ["athlete-1"]);
+
+  const undone = togglePersonalTrainingReaction(changed, "athlete-1", "👏");
   assert.deepEqual(undone.reactions["🔥"], []);
+  assert.deepEqual(undone.reactions["👏"], []);
 });
 
 test("mídias pessoais aceitam apenas formatos suportados, até cinco arquivos de 10 MB", () => {

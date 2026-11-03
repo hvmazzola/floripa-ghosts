@@ -9,7 +9,7 @@ export const personalTrainingCategories = [
 ] as const;
 
 export type PersonalTrainingCategory = (typeof personalTrainingCategories)[number];
-export type PersonalTrainingReaction = "💪" | "🔥" | "👏";
+export type PersonalTrainingReaction = string;
 export const personalTrainingMediaTypes = [
   "image/jpeg",
   "image/png",
@@ -38,7 +38,7 @@ export type PersonalTraining = {
   perceivedLoad: number;
   notes: string;
   media: PersonalTrainingMedia[];
-  reactions: Record<PersonalTrainingReaction, string[]>;
+  reactions: Record<string, string[]>;
 };
 export type PersonalTrainingInput = Omit<
   PersonalTraining,
@@ -148,15 +148,26 @@ export function togglePersonalTrainingReaction(
   memberId: string,
   reaction: PersonalTrainingReaction,
 ): PersonalTraining {
-  const memberIds = training.reactions[reaction] ?? [];
+  const normalizedReaction = reaction.trim();
+  if (!normalizedReaction || normalizedReaction.length > 16) {
+    throw new Error("Escolha uma reação válida.");
+  }
+  const isCurrentReaction = training.reactions[normalizedReaction]?.includes(memberId);
+  const reactions = Object.fromEntries(
+    Object.entries(training.reactions).map(([emoji, memberIds]) => [
+      emoji,
+      memberIds.filter((id) => id !== memberId),
+    ]),
+  );
+  if (!isCurrentReaction) {
+    reactions[normalizedReaction] = [
+      ...(reactions[normalizedReaction] ?? []),
+      memberId,
+    ];
+  }
   return {
     ...training,
-    reactions: {
-      ...training.reactions,
-      [reaction]: memberIds.includes(memberId)
-        ? memberIds.filter((id) => id !== memberId)
-        : [...memberIds, memberId],
-    },
+    reactions,
   };
 }
 
@@ -220,12 +231,11 @@ export function isPersonalTrainingList(value: unknown): value is PersonalTrainin
               );
             }))) &&
         training.reactions &&
-        ["💪", "🔥", "👏"].every(
-          (reaction) =>
-            Array.isArray(training.reactions[reaction]) &&
-            training.reactions[reaction].every(
-              (memberId: unknown) => typeof memberId === "string",
-            ),
+        typeof training.reactions === "object" &&
+        Object.values(training.reactions).every(
+          (memberIds) =>
+            Array.isArray(memberIds) &&
+            memberIds.every((memberId: unknown) => typeof memberId === "string"),
         ),
     )
   );
