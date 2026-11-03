@@ -535,7 +535,7 @@ export function PersonalTrainingsView({
                             : "Reagir ao treino"
                         }
                         aria-pressed={actorHasReacted}
-                        className={`grid size-8 place-items-center rounded-md transition-colors ${actorHasReacted ? "bg-[#173447] text-[#8fe0ff]" : "text-[#b9c7cf] hover:bg-[#1c2932] hover:text-white"}`}
+                        className={`grid size-8 place-items-center rounded-md border transition-colors ${actorHasReacted ? "border-[#58cfff] bg-[#173447] text-[#8fe0ff]" : "border-transparent text-[#b9c7cf] hover:bg-[#1c2932] hover:text-white"}`}
                         onMouseEnter={() => openReactionMenu(training.id)}
                         onMouseLeave={closeReactionMenu}
                         type="button"
@@ -574,7 +574,7 @@ export function PersonalTrainingsView({
                             <button
                               aria-label={label}
                               aria-pressed={actorReaction === value}
-                              className={`grid size-9 place-items-center rounded-md text-lg transition-colors ${actorReaction === value ? "bg-[#173447] ring-1 ring-[#58cfff]" : "hover:bg-[#24313a]"}`}
+                              className={`grid size-9 place-items-center rounded-md border text-lg transition-colors ${actorReaction === value ? "border-[#58cfff] bg-[#173447]" : "border-transparent hover:bg-[#24313a]"}`}
                               key={value}
                               onClick={() => {
                                 onReact(training, value);
