@@ -536,6 +536,14 @@ export function PersonalTrainingsView({
                         }
                         aria-pressed={actorHasReacted}
                         className={`grid size-8 place-items-center rounded-md border transition-colors ${actorHasReacted ? "border-[#58cfff] bg-[#173447] text-[#8fe0ff]" : "border-transparent text-[#b9c7cf] hover:bg-[#1c2932] hover:text-white"}`}
+                        onClick={(event) => {
+                          if (!actorReaction) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onReact(training, actorReaction);
+                          setPickerTrainingId(null);
+                          setFullPickerTrainingId(null);
+                        }}
                         onMouseEnter={() => openReactionMenu(training.id)}
                         onMouseLeave={closeReactionMenu}
                         type="button"
