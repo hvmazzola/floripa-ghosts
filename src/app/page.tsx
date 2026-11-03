@@ -36,10 +36,13 @@ import {
   seedTeamPosts,
 } from "@/domain/communication";
 import {
+  addPersonalTrainingComment,
   createPersonalTraining,
+  deletePersonalTrainingComment,
   isPersonalTrainingList,
   seedPersonalTrainings,
   togglePersonalTrainingReaction,
+  updatePersonalTrainingComment,
   updatePersonalTraining,
 } from "@/domain/personal-training";
 import { Button } from "@/components/ui/button";
@@ -638,6 +641,78 @@ export default function Home() {
       personalTrainings.map((item) => (item.id === updated.id ? updated : item)),
     );
   };
+  const addPersonalTrainingCommentEntry = (
+    training: PersonalTraining,
+    message: string,
+  ) => {
+    try {
+      const updated = addPersonalTrainingComment(training, message, actor);
+      savePersonalTrainings(
+        personalTrainings.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      return true;
+    } catch (error) {
+      showFeedback(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível publicar o comentário.",
+        "error",
+      );
+      return false;
+    }
+  };
+  const updatePersonalTrainingCommentEntry = (
+    training: PersonalTraining,
+    commentId: string,
+    message: string,
+  ) => {
+    try {
+      const updated = updatePersonalTrainingComment(
+        training,
+        commentId,
+        message,
+        actor,
+      );
+      savePersonalTrainings(
+        personalTrainings.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      return true;
+    } catch (error) {
+      showFeedback(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível editar o comentário.",
+        "error",
+      );
+      return false;
+    }
+  };
+  const deletePersonalTrainingCommentEntry = (
+    training: PersonalTraining,
+    commentId: string,
+  ) => {
+    setConfirmation({
+      title: "Excluir comentário?",
+      description: "O comentário será removido da timeline do time.",
+      confirmLabel: "Excluir",
+      onConfirm: () => {
+        try {
+          const updated = deletePersonalTrainingComment(training, commentId, actor);
+          savePersonalTrainings(
+            personalTrainings.map((item) => (item.id === updated.id ? updated : item)),
+          );
+          showFeedback("Comentário excluído.", "success");
+        } catch (error) {
+          showFeedback(
+            error instanceof Error
+              ? error.message
+              : "Não foi possível excluir o comentário.",
+            "error",
+          );
+        }
+      },
+    });
+  };
   const confirmed =
     current?.invitations.filter((invitation) => invitation.rsvp === "yes").length ?? 0;
   const actual =
@@ -1042,6 +1117,9 @@ export default function Home() {
               onUpdate={updatePersonalTrainingEntry}
               onDelete={deletePersonalTrainingEntry}
               onReact={reactToPersonalTraining}
+              onAddComment={addPersonalTrainingCommentEntry}
+              onUpdateComment={updatePersonalTrainingCommentEntry}
+              onDeleteComment={deletePersonalTrainingCommentEntry}
             />
           ) : view === "communication" ? (
             <CommunicationView

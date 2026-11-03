@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  addPersonalTrainingComment,
   createPersonalTraining,
+  deletePersonalTrainingComment,
   togglePersonalTrainingReaction,
+  updatePersonalTrainingComment,
   validatePersonalTrainingMedia,
 } from "../src/domain/personal-training.ts";
 import { seedMembers } from "../src/domain/training.ts";
@@ -74,4 +77,27 @@ test("mídias pessoais aceitam apenas formatos suportados, até cinco arquivos d
       })),
     ),
   );
+});
+
+test("comentários respeitam autoria e admins podem moderar", () => {
+  const roster = seedMembers();
+  const training = createPersonalTraining(input, roster[0], roster);
+  const withComment = addPersonalTrainingComment(training, "Bom trabalho!", roster[2]);
+  const comment = withComment.comments[0];
+  assert.equal(comment.authorId, "athlete-1");
+  assert.equal(comment.message, "Bom trabalho!");
+
+  const edited = updatePersonalTrainingComment(
+    withComment,
+    comment.id,
+    "Bom trabalho, segue firme!",
+    roster[2],
+  );
+  assert.equal(edited.comments[0].message, "Bom trabalho, segue firme!");
+  assert.throws(() =>
+    updatePersonalTrainingComment(edited, comment.id, "Não pode", roster[0]),
+  );
+
+  const moderated = deletePersonalTrainingComment(edited, comment.id, roster[1]);
+  assert.equal(moderated.comments.length, 0);
 });

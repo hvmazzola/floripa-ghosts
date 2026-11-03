@@ -4,7 +4,7 @@ import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import dynamic from "next/dynamic";
-import { Dumbbell, Plus, SmilePlus } from "lucide-react";
+import { Dumbbell, MessageCircle, Plus, SmilePlus } from "lucide-react";
 
 import { RecordActionsMenu } from "@/components/record-actions-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,6 +15,7 @@ import {
   personalTrainingCategoryLabel,
   personalTrainingMediaTypes,
   type PersonalTraining,
+  type PersonalTrainingComment,
   type PersonalTrainingInput,
   type PersonalTrainingMedia,
   type PersonalTrainingMediaType,
@@ -348,6 +349,9 @@ export function PersonalTrainingsView({
   onUpdate,
   onDelete,
   onReact,
+  onAddComment,
+  onUpdateComment,
+  onDeleteComment,
 }: {
   trainings: PersonalTraining[];
   roster: Member[];
@@ -356,12 +360,25 @@ export function PersonalTrainingsView({
   onUpdate: (training: PersonalTraining, input: PersonalTrainingInput) => boolean;
   onDelete: (training: PersonalTraining) => void;
   onReact: (training: PersonalTraining, reaction: PersonalTrainingReaction) => void;
+  onAddComment: (training: PersonalTraining, message: string) => boolean;
+  onUpdateComment: (
+    training: PersonalTraining,
+    commentId: string,
+    message: string,
+  ) => boolean;
+  onDeleteComment: (training: PersonalTraining, commentId: string) => void;
 }) {
   const [editing, setEditing] = useState<PersonalTraining | null | undefined>(
     undefined,
   );
   const [pickerTrainingId, setPickerTrainingId] = useState<string | null>(null);
   const [fullPickerTrainingId, setFullPickerTrainingId] = useState<string | null>(null);
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [editingComment, setEditingComment] = useState<{
+    trainingId: string;
+    comment: PersonalTrainingComment;
+  } | null>(null);
+  const [editingCommentMessage, setEditingCommentMessage] = useState("");
   const canRegister = actor.status === "active" && actor.roles.includes("athlete");
   const sortedTrainings = [...trainings].sort(
     (first, second) => Date.parse(second.occurredAt) - Date.parse(first.occurredAt),
@@ -390,6 +407,14 @@ export function PersonalTrainingsView({
         {sortedTrainings.map((training) => {
           const author = roster.find((member) => member.id === training.authorId);
           const isOwner = training.authorId === actor.id;
+          const reactionSummary = Object.entries(training.reactions)
+            .filter(([, memberIds]) => memberIds.length > 0)
+            .sort(([, first], [, second]) => second.length - first.length);
+          const totalReactions = reactionSummary.reduce(
+            (total, [, memberIds]) => total + memberIds.length,
+            0,
+          );
+          const comments = training.comments ?? [];
           return (
             <article className="panel p-5" key={training.id}>
               <div className="flex items-start justify-between gap-4">
@@ -476,6 +501,18 @@ export function PersonalTrainingsView({
                   ))}
                 </div>
               )}
+              {reactionSummary.length > 0 && (
+                <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#b9c7cf]">
+                  {reactionSummary.map(([emoji, memberIds]) => (
+                    <span key={emoji}>
+                      {emoji} {memberIds.length}
+                    </span>
+                  ))}
+                  <span className="text-[#82929d]">
+                    {totalReactions} {totalReactions === 1 ? "reação" : "reações"}
+                  </span>
+                </div>
+              )}
               <div className="mt-5 flex flex-wrap gap-2 border-t border-[#29313a] pt-4">
                 <Popover
                   open={pickerTrainingId === training.id}
@@ -536,6 +573,138 @@ export function PersonalTrainingsView({
                   </PopoverContent>
                 </Popover>
               </div>
+              <section className="mt-5 border-t border-[#29313a] pt-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[#dce9ef]">
+                  <MessageCircle size={15} className="text-[#83dfff]" />
+                  Comentários {comments.length > 0 && `(${comments.length})`}
+                </div>
+                {comments.length > 0 && (
+                  <div className="mt-4 grid gap-3">
+                    {comments.map((comment) => {
+                      const commentAuthor = roster.find(
+                        (member) => member.id === comment.authorId,
+                      );
+                      const isEditing =
+                        editingComment?.trainingId === training.id &&
+                        editingComment.comment.id === comment.id;
+                      const canEdit = comment.authorId === actor.id;
+                      const canDelete = canEdit || actor.isAdmin;
+                      return (
+                        <article
+                          className="rounded-lg bg-[#151a20] p-3"
+                          key={comment.id}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-bold text-[#e5f0f5]">
+                                {commentAuthor?.name ?? "Integrante"}
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-[#82929d]">
+                                {format(parseISO(comment.createdAt), "dd MMM · HH:mm", {
+                                  locale: ptBR,
+                                })}
+                                {comment.updatedAt ? " · editado" : ""}
+                              </p>
+                            </div>
+                            <RecordActionsMenu
+                              label={`Opções do comentário de ${commentAuthor?.name ?? "integrante"}`}
+                              actions={[
+                                {
+                                  id: "edit",
+                                  label: "Editar",
+                                  allowed: canEdit,
+                                  onSelect: () => {
+                                    setEditingComment({
+                                      trainingId: training.id,
+                                      comment,
+                                    });
+                                    setEditingCommentMessage(comment.message);
+                                  },
+                                },
+                                {
+                                  id: "delete",
+                                  label: "Excluir",
+                                  allowed: canDelete,
+                                  destructive: true,
+                                  onSelect: () => onDeleteComment(training, comment.id),
+                                },
+                              ]}
+                            />
+                          </div>
+                          {isEditing ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <input
+                                className="min-w-0 flex-1 rounded-md border border-[#3b4b56] bg-[#0b0d10] px-3 py-2 text-sm text-white outline-none focus:border-[#58cfff]"
+                                value={editingCommentMessage}
+                                onChange={(event) =>
+                                  setEditingCommentMessage(event.target.value)
+                                }
+                              />
+                              <button
+                                className="secondary !px-3 !py-2 !text-xs"
+                                onClick={() => setEditingComment(null)}
+                                type="button"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                className="primary !px-3 !py-2 !text-xs"
+                                onClick={() => {
+                                  if (
+                                    onUpdateComment(
+                                      training,
+                                      comment.id,
+                                      editingCommentMessage,
+                                    )
+                                  ) {
+                                    setEditingComment(null);
+                                  }
+                                }}
+                                type="button"
+                              >
+                                Salvar
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-[#c5d0d7]">
+                              {comment.message}
+                            </p>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+                {actor.status === "active" && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <input
+                      className="min-w-0 flex-1 rounded-md border border-[#3b4b56] bg-[#0b0d10] px-3 py-2 text-sm text-white outline-none placeholder:text-[#74828c] focus:border-[#58cfff]"
+                      placeholder="Escreva um comentário"
+                      value={commentDrafts[training.id] ?? ""}
+                      onChange={(event) =>
+                        setCommentDrafts((current) => ({
+                          ...current,
+                          [training.id]: event.target.value,
+                        }))
+                      }
+                    />
+                    <button
+                      className="secondary !px-3 !py-2 !text-xs"
+                      onClick={() => {
+                        if (onAddComment(training, commentDrafts[training.id] ?? "")) {
+                          setCommentDrafts((current) => ({
+                            ...current,
+                            [training.id]: "",
+                          }));
+                        }
+                      }}
+                      type="button"
+                    >
+                      Comentar
+                    </button>
+                  </div>
+                )}
+              </section>
             </article>
           );
         })}
