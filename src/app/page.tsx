@@ -45,6 +45,14 @@ import {
   updatePersonalTrainingComment,
   updatePersonalTraining,
 } from "@/domain/personal-training";
+import {
+  canDeletePlay,
+  createPlay,
+  getVisiblePlays,
+  isPlayList,
+  seedPlays,
+  updatePlay,
+} from "@/domain/playbook";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -65,6 +73,7 @@ import {
   Menu,
   MessageCircle,
   Dumbbell,
+  BookOpen,
   Plus,
   UsersRound,
 } from "lucide-react";
@@ -87,6 +96,7 @@ import type {
   PersonalTrainingInput,
   PersonalTrainingReaction,
 } from "@/domain/personal-training";
+import type { Play, PlayInput } from "@/domain/playbook";
 import {
   CommunicationView,
   PostModal,
@@ -95,6 +105,7 @@ import { Dashboard, TrainingCalendar } from "@/features/dashboard/dashboard-view
 import { TrainingEditor } from "@/features/trainings/training-editor";
 import { ProfileEditor } from "@/features/roster/profile-editor";
 import { PersonalTrainingsView } from "@/features/personal-trainings/personal-trainings-view";
+import { PlaybookView } from "@/features/playbook/playbook-view";
 import { readStoredText, readStoredValue, writeStoredValue } from "@/lib/demo-store";
 import { getContextMenuPosition } from "@/lib/context-menu";
 import { getVideoEmbedUrl } from "@/lib/video-embed";
@@ -106,6 +117,7 @@ const SELECTED_STORAGE = "ghosts-demo-selected-training-v1";
 const EXERCISE_STORAGE = "ghosts-demo-exercises-v1";
 const COMMUNICATION_STORAGE = "ghosts-demo-communication-v1";
 const PERSONAL_TRAINING_STORAGE = "ghosts-demo-personal-trainings-v1";
+const PLAYBOOK_STORAGE = "ghosts-demo-playbook-v1";
 const ATHLETE_ID = "mazzola";
 const COACH_ID = "coach-demo";
 const rsvpLabel: Record<RSVP, string> = {
@@ -123,6 +135,7 @@ type AppView =
   | "dashboard"
   | "trainings"
   | "personal-trainings"
+  | "playbook"
   | "roster"
   | "profile"
   | "exercises"
@@ -194,6 +207,7 @@ export default function Home() {
   const [exercises, setExercises] = useState<TrainingActivity[]>([]);
   const [posts, setPosts] = useState<TeamPost[]>([]);
   const [personalTrainings, setPersonalTrainings] = useState<PersonalTraining[]>([]);
+  const [plays, setPlays] = useState<Play[]>([]);
   const [exerciseDraft, setExerciseDraft] = useState<TrainingActivity | null>(null);
   const [exerciseSubmitted, setExerciseSubmitted] = useState(false);
   const [exerciseVideoError, setExerciseVideoError] = useState(false);
@@ -261,6 +275,7 @@ export default function Home() {
           "dashboard",
           "trainings",
           "personal-trainings",
+          "playbook",
           "roster",
           "profile",
           "exercises",
@@ -304,6 +319,14 @@ export default function Home() {
       PERSONAL_TRAINING_STORAGE,
       storedPersonalTrainings.value,
     );
+    const storedPlays = readStoredValue(
+      localStorage,
+      PLAYBOOK_STORAGE,
+      isPlayList,
+      seedPlays(),
+    );
+    setPlays(storedPlays.value);
+    writeStoredValue(localStorage, PLAYBOOK_STORAGE, storedPlays.value);
     const storedTrainings = readStoredValue(localStorage, STORAGE, Array.isArray, []);
     const migrated = migrateTrainingList(storedTrainings.value, initialRoster);
     const initial = (migrated ?? seedTrainings()).map((training) => ({
@@ -340,6 +363,7 @@ export default function Home() {
       storedExercises.recovered ||
       storedPosts.recovered ||
       storedPersonalTrainings.recovered ||
+      storedPlays.recovered ||
       storedTrainings.recovered
     ) {
       setNotice("Armazenamento indisponível. Os dados ficarão nesta sessão.");
@@ -713,6 +737,53 @@ export default function Home() {
       },
     });
   };
+  const savePlays = (next: Play[]) => {
+    setPlays(next);
+    writeStoredValue(localStorage, PLAYBOOK_STORAGE, next);
+  };
+  const createPlayEntry = (input: PlayInput) => {
+    try {
+      const play = createPlay(input, actor);
+      savePlays([play, ...plays]);
+      showFeedback("Jogada criada no playbook.", "success");
+      return true;
+    } catch (error) {
+      showFeedback(
+        error instanceof Error ? error.message : "Não foi possível criar a jogada.",
+        "error",
+      );
+      return false;
+    }
+  };
+  const updatePlayEntry = (play: Play, input: PlayInput) => {
+    try {
+      const updated = updatePlay(play, input, actor);
+      savePlays(plays.map((item) => (item.id === updated.id ? updated : item)));
+      showFeedback("Jogada atualizada.", "success");
+      return true;
+    } catch (error) {
+      showFeedback(
+        error instanceof Error ? error.message : "Não foi possível atualizar a jogada.",
+        "error",
+      );
+      return false;
+    }
+  };
+  const deletePlayEntry = (play: Play) => {
+    if (!canDeletePlay(actor)) {
+      showFeedback("Somente admins podem excluir jogadas.", "error");
+      return;
+    }
+    setConfirmation({
+      title: "Excluir jogada?",
+      description: `“${play.title}” será removida do playbook.`,
+      confirmLabel: "Excluir",
+      onConfirm: () => {
+        savePlays(plays.filter((item) => item.id !== play.id));
+        showFeedback("Jogada excluída.", "success");
+      },
+    });
+  };
   const confirmed =
     current?.invitations.filter((invitation) => invitation.rsvp === "yes").length ?? 0;
   const actual =
@@ -802,6 +873,24 @@ export default function Home() {
               className={`whitespace-nowrap text-[13px] font-bold transition-[max-width,opacity,transform] duration-300 ease-out motion-reduce:transition-none ${sidebarOpen ? "max-w-40 translate-x-0 opacity-100" : "max-w-0 -translate-x-2 opacity-0"}`}
             >
               Timeline
+            </span>
+          </button>
+          <button
+            className={`flex h-12 items-center overflow-hidden rounded-[10px] text-left transition-colors focus-visible:outline focus-visible:outline-3 focus-visible:outline-[#2eb8ff] ${view === "playbook" ? "bg-[#17232c] text-[#f4f8fb] shadow-[inset_3px_0_#2eb8ff]" : "text-[#98a3ad] hover:bg-[#151d24] hover:text-[#eaf4f9]"}`}
+            aria-label="Playbook"
+            onClick={() => setActiveView("playbook")}
+          >
+            <span className="grid h-12 w-12 min-w-12 place-items-center">
+              <BookOpen
+                className={view === "playbook" ? "text-[#58cfff]" : "text-[#8a97a2]"}
+                size={19}
+                strokeWidth={1.8}
+              />
+            </span>
+            <span
+              className={`whitespace-nowrap text-[13px] font-bold transition-[max-width,opacity,transform] duration-300 ease-out motion-reduce:transition-none ${sidebarOpen ? "max-w-40 translate-x-0 opacity-100" : "max-w-0 -translate-x-2 opacity-0"}`}
+            >
+              Playbook
             </span>
           </button>
           <button
@@ -911,13 +1000,15 @@ export default function Home() {
                   ? "Treinos e agenda"
                   : view === "personal-trainings"
                     ? "Timeline"
-                    : view === "roster"
-                      ? "Elenco"
-                      : view === "exercises"
-                        ? "Exercícios"
-                        : view === "communication"
-                          ? "Comunicação"
-                          : "Meu perfil"}
+                    : view === "playbook"
+                      ? "Playbook"
+                      : view === "roster"
+                        ? "Elenco"
+                        : view === "exercises"
+                          ? "Exercícios"
+                          : view === "communication"
+                            ? "Comunicação"
+                            : "Meu perfil"}
             </span>
           </nav>
           <div className="relative flex items-center gap-3">
@@ -1065,13 +1156,15 @@ export default function Home() {
                     ? "Treinos"
                     : view === "personal-trainings"
                       ? "Timeline"
-                      : view === "roster"
-                        ? "Pessoas"
-                        : view === "exercises"
-                          ? "Exercícios"
-                          : view === "communication"
-                            ? "Comunicação"
-                            : "Perfil"}
+                      : view === "playbook"
+                        ? "Playbook"
+                        : view === "roster"
+                          ? "Pessoas"
+                          : view === "exercises"
+                            ? "Exercícios"
+                            : view === "communication"
+                              ? "Comunicação"
+                              : "Perfil"}
               </h1>
               <p className="subtitle">
                 {view === "dashboard"
@@ -1080,13 +1173,15 @@ export default function Home() {
                     ? "Seu ponto de encontro para planejar, participar e acompanhar."
                     : view === "personal-trainings"
                       ? "Treinos pessoais e consistência compartilhados com o time."
-                      : view === "roster"
-                        ? "Um elenco, diferentes posições. A mesma direção."
-                        : view === "exercises"
-                          ? "Templates prontos para acelerar o planejamento."
-                          : view === "communication"
-                            ? "Avisos do time e feedbacks que ajudam a evoluir juntos."
-                            : "Seus dados esportivos e sua atuação no time."}
+                      : view === "playbook"
+                        ? "Estratégias de flag football 5x5 para desenhar, publicar e consultar."
+                        : view === "roster"
+                          ? "Um elenco, diferentes posições. A mesma direção."
+                          : view === "exercises"
+                            ? "Templates prontos para acelerar o planejamento."
+                            : view === "communication"
+                              ? "Avisos do time e feedbacks que ajudam a evoluir juntos."
+                              : "Seus dados esportivos e sua atuação no time."}
               </p>
             </div>
             {role === "coach" && view === "trainings" && (
@@ -1120,6 +1215,14 @@ export default function Home() {
               onAddComment={addPersonalTrainingCommentEntry}
               onUpdateComment={updatePersonalTrainingCommentEntry}
               onDeleteComment={deletePersonalTrainingCommentEntry}
+            />
+          ) : view === "playbook" ? (
+            <PlaybookView
+              plays={getVisiblePlays(plays, actor)}
+              actor={actor}
+              onCreate={createPlayEntry}
+              onUpdate={updatePlayEntry}
+              onDelete={deletePlayEntry}
             />
           ) : view === "communication" ? (
             <CommunicationView
