@@ -26,3 +26,10 @@ npm run format:check
 ```
 
 Os dados da demonstração são guardados no armazenamento local do navegador.
+
+## Teste compartilhado
+
+Para validar uma versão estática sem instalar o ambiente de desenvolvimento,
+consulte o [guia de teste compartilhado](docs/guia-teste-compartilhado.md).
+O pacote é gerado localmente com `npm run share` e fica pronto para distribuição
+na pasta `out/`.
