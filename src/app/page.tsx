@@ -50,6 +50,7 @@ import {
   createPlay,
   getVisiblePlays,
   isPlayList,
+  normalizePlayList,
   seedPlays,
   updatePlay,
 } from "@/domain/playbook";
@@ -325,8 +326,9 @@ export default function Home() {
       isPlayList,
       seedPlays(),
     );
-    setPlays(storedPlays.value);
-    writeStoredValue(localStorage, PLAYBOOK_STORAGE, storedPlays.value);
+    const initialPlays = normalizePlayList(storedPlays.value);
+    setPlays(initialPlays);
+    writeStoredValue(localStorage, PLAYBOOK_STORAGE, initialPlays);
     const storedTrainings = readStoredValue(localStorage, STORAGE, Array.isArray, []);
     const migrated = migrateTrainingList(storedTrainings.value, initialRoster);
     const initial = (migrated ?? seedTrainings()).map((training) => ({
