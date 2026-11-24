@@ -5,16 +5,12 @@ instalação de Node.js, acesso ao código ou conta de desenvolvimento.
 
 ## Abrir a aplicação
 
-1. [Baixe o pacote de teste](https://github.com/hvmazzola/floripa-ghosts/raw/refs/heads/feat/communication-experience/pacotes-teste/floripa-ghosts-teste.zip) e descompacte o arquivo.
-2. Abra a pasta extraída.
-3. Dê duplo clique em `INICIAR-TESTE.bat`.
+1. Instale o Python 3 para Windows em <https://www.python.org/downloads/>. Durante a instalação, marque a opção **Add Python to PATH** (ou equivalente). Se o Python 3 já estiver instalado, pule esta etapa.
+2. [Baixe o pacote de teste](https://github.com/hvmazzola/floripa-ghosts/raw/refs/heads/feat/communication-experience/pacotes-teste/floripa-ghosts-teste.zip) e descompacte o arquivo.
+3. Abra a pasta extraída e dê duplo clique em `INICIAR-TESTE.bat`.
 4. Mantenha a janela que abrir em execução durante o teste.
-5. O navegador abrirá em `http://localhost:4173`.
+5. O navegador abrirá em `http://localhost:4173`. Se aparecer que a página não está disponível, aguarde alguns segundos e atualize a página. Se continuar indisponível, confira se a janela informa algum erro.
 6. Ao terminar, feche a janela do terminal para encerrar a aplicação.
-
-Se o Windows informar que Python não está instalado, instale a versão atual em
-<https://www.python.org/downloads/> e repita o passo 3. Marque a opção para
-adicionar Python ao PATH durante a instalação.
 
 > Esta é uma demonstração local: cada navegador mantém seus próprios dados.
 > O que uma pessoa criar não aparece automaticamente para as outras.
