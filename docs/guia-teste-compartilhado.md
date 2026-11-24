@@ -5,7 +5,7 @@ instalação de Node.js, acesso ao código ou conta de desenvolvimento.
 
 ## Abrir a aplicação
 
-1. [Baixe o pacote de teste](../pacotes-teste/floripa-ghosts-teste.zip) pelo GitHub e descompacte o arquivo.
+1. [Baixe o pacote de teste](https://github.com/hvmazzola/floripa-ghosts/raw/refs/heads/feat/communication-experience/pacotes-teste/floripa-ghosts-teste.zip) e descompacte o arquivo.
 2. Abra a pasta extraída.
 3. Dê duplo clique em `INICIAR-TESTE.bat`.
 4. Mantenha a janela que abrir em execução durante o teste.
