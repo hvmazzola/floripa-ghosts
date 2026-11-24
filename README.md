@@ -3,6 +3,8 @@
 Aplicação local de demonstração para organizar elenco, treinos, convocações,
 confirmações e presenças do Floripa Ghosts.
 
+**Quer testar a plataforma?** Acesse o [guia de teste compartilhado](https://github.com/hvmazzola/floripa-ghosts/blob/feat/communication-experience/docs/guia-teste-compartilhado.md) para baixar o pacote e seguir as instruções.
+
 ## Estrutura
 
 - `src/app`: rota principal, layout e fundação visual global.
@@ -30,6 +32,6 @@ Os dados da demonstração são guardados no armazenamento local do navegador.
 ## Teste compartilhado
 
 Para validar uma versão estática sem instalar o ambiente de desenvolvimento,
-consulte o [guia de teste compartilhado](docs/guia-teste-compartilhado.md).
+consulte o [guia de teste compartilhado](https://github.com/hvmazzola/floripa-ghosts/blob/feat/communication-experience/docs/guia-teste-compartilhado.md).
 O pacote é gerado localmente com `npm run share` e fica pronto para distribuição
 na pasta `out/`.
